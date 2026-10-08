@@ -1,0 +1,36 @@
+# Data — never commit real audio or large derived binary features
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Signed consent forms are personal data — keep local, never push
+data/consent_forms/signed/
+
+# Python & environments
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Large checkpoints / models / zip archives
+*.pt
+*.ckpt
+*.onnx
+*.pkl
+checkpoints/
+*.zip
+
+# Frontend build & temporary cache
+.vite/
+node_modules/
+dist/
+
+# Notebooks checkpoints
+.ipynb_checkpoints/
+
+# Env / secrets
+.env
+
+# OS
+.DS_Store

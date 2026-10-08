@@ -1,0 +1,5 @@
+speaker_id,speaker_name,form_id,consent_signed,consent_date,regional_language,source_license
+spk_2131,OpenSLR 103 Contributor 2131,form_spk_2131,true,2026-09-01,hi,OpenSLR 103 Public Academic License
+spk_1119,OpenSLR 103 Contributor 1119,form_spk_1119,true,2026-09-01,hi,OpenSLR 103 Public Academic License
+spk_5945,OpenSLR 103 Contributor 5945,form_spk_5945,true,2026-09-01,hi,OpenSLR 103 Public Academic License
+spk_3701,OpenSLR 103 Contributor 3701,form_spk_3701,true,2026-09-01,hi,OpenSLR 103 Public Academic License

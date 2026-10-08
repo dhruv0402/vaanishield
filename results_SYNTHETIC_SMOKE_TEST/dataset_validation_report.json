@@ -1,0 +1,37 @@
+{
+  "framework": "VaaniShield Multi-Modal Dataset Validation (G-Eval + Cohen's Kappa)",
+  "geval_evaluation": {
+    "acoustic_seam_plausibility": {
+      "mean": 4.87,
+      "std": 0.09,
+      "min": 4.8,
+      "max": 5.0
+    },
+    "alignment_quality": {
+      "mean": 4.9,
+      "std": 0.0,
+      "min": 4.9,
+      "max": 4.9
+    },
+    "telecom_realism": {
+      "mean": 4.9,
+      "std": 0.0,
+      "min": 4.9,
+      "max": 4.9
+    },
+    "privacy_compliance": {
+      "mean": 5.0,
+      "std": 0.0,
+      "min": 5.0,
+      "max": 5.0
+    }
+  },
+  "inter_annotator_agreement": {
+    "n_samples": 60,
+    "rater_1_vs_rater_2_kappa": 0.7464,
+    "rater_1_vs_rater_3_kappa": 0.7464,
+    "rater_2_vs_rater_3_kappa": 0.7802,
+    "mean_cohen_kappa": 0.7577,
+    "agreement_tier": "Substantial Agreement"
+  }
+}

@@ -1,0 +1,64 @@
+# VaaniShield default configuration
+# All modules should read parameters from here rather than hardcoding them,
+# so experiments (ablations, baselines) stay reproducible and diffable.
+
+paths:
+  raw_audio_dir: "data/raw"
+  processed_dir: "data/processed"
+  checkpoints_dir: "checkpoints"
+  results_dir: "results"
+
+languages:
+  primary_pair: ["hi", "en"]          # Hindi-English — primary
+  secondary_pair: ["kn", "en"]        # Kannada-English — regional South Indian
+  tertiary_pair: ["ta", "en"]         # Tamil-English — regional South Indian
+
+boundary_localization:
+  language_id_model: "fasttext-lid176"
+  alignment_backend: "mfa"            # options: "mfa", "whisper"
+  window_ms_before: 300
+  window_ms_after: 300
+
+boundary_features:
+  # Handcrafted, frame-level features extracted inside each boundary window.
+  features:
+    - f0_reset_magnitude
+    - energy_discontinuity
+    - phone_duration_ratio
+    - formant_transition_smoothness
+    - mfcc_delta_magnitude
+  aggregation: "mean_and_max"         # how per-boundary vectors combine to one per utterance
+
+speaker_null:
+  ssl_backbone: "microsoft/wavlm-base-plus"   # swap for wav2vec2-xlsr if preferred
+  projection_method: "snap_orthogonal"
+  embedding_dim: 768
+
+fusion:
+  classifier: "logistic_regression"   # options: "logistic_regression", "small_mlp"
+  mlp_hidden_dim: 64                  # only used if classifier == "small_mlp"
+  calibration: "isotonic"             # for producing a usable probability + CI
+
+dataset_construction:
+  cloning_systems_train: ["xtts"]
+  cloning_systems_heldout: ["xtts_heldout"]     # excluded from training — generalization test
+  noise_augmentations:
+    - "codec_compression"
+    - "amr_wb_compression"
+    - "packet_loss_simulation"
+    - "background_noise_injection"
+
+evaluation:
+  metrics: ["eer", "precision", "recall", "bootstrap_ci"]
+  bootstrap_resamples: 2000
+  report_breakdown_by: ["language_pair", "noise_condition"]
+  baselines:
+    - name: "baseline_a_generic"
+      description: "Generic WavLM/wav2vec2 classifier, no boundary-awareness, no speaker-nulling"
+    - name: "baseline_b_indian_accent"
+      description: "Re-implementation of published Mel+LFCC+Wav2Vec Indian-accent fusion model"
+
+explainability:
+  method: "shap"
+  surface: "per_boundary_point"       # explanation must point to specific code-switch points,
+                                        # never to raw transcript content (privacy — see docs/PRIVACY_AND_ETHICS.md)
