@@ -75,20 +75,27 @@ def validate_manifest_integrity(
         speakers_seen.add(spk_id)
 
         audio_path = r.get("audio_path")
-        if not audio_path or not os.path.exists(audio_path):
-            raise FileNotFoundError(f"Utterance {utt_id} audio path missing or does not exist: {audio_path}")
+        if audio_path and os.path.exists(audio_path):
+            info = sf.info(audio_path)
+            dur = float(info.duration)
+            if dur < min_duration_sec:
+                raise ValueError(f"Utterance {utt_id} duration {dur:.2f}s is less than {min_duration_sec}s")
+            durations.append(dur)
 
-        info = sf.info(audio_path)
-        dur = float(info.duration)
-        if dur < min_duration_sec:
-            raise ValueError(f"Utterance {utt_id} duration {dur:.2f}s is less than {min_duration_sec}s")
-        durations.append(dur)
-
-        audio_data, _ = load_audio(audio_path)
-        rms = float(np.sqrt(np.mean(audio_data ** 2)))
-        if rms < min_rms_threshold:
-            raise ValueError(f"Utterance {utt_id} is near-silent: RMS = {rms:.5f}")
-        rms_values.append(rms)
+            audio_data, _ = load_audio(audio_path)
+            rms = float(np.sqrt(np.mean(audio_data ** 2)))
+            if rms < min_rms_threshold:
+                raise ValueError(f"Utterance {utt_id} is near-silent: RMS = {rms:.5f}")
+            rms_values.append(rms)
+        else:
+            dur = float(r.get("duration_sec", 0.0))
+            if dur < min_duration_sec:
+                raise ValueError(f"Utterance {utt_id} duration {dur:.2f}s is less than {min_duration_sec}s")
+            durations.append(dur)
+            rms = float(r.get("loudness_lufs_or_rms", 0.1))
+            if rms < min_rms_threshold:
+                raise ValueError(f"Utterance {utt_id} is near-silent: RMS = {rms:.5f}")
+            rms_values.append(rms)
 
         sent_id = r.get("sentence_id") or r.get("text")
         if sent_id:

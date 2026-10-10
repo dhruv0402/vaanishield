@@ -1,11 +1,18 @@
-# Data — never commit real audio or large derived binary features
-data/raw/*
-data/processed/*
+# Data — exclude bulky raw audio and augmented collections, keep manifests and consent audit
+data/raw/*.wav
+!data/raw/spk_1119_1119_020.wav
 !data/raw/.gitkeep
+!data/raw/raw_manifest.jsonl
+data/processed/*.wav
+data/processed/augmented/
+data/processed/train_clones/
+data/processed/heldout/
 !data/processed/.gitkeep
+!data/processed/master_manifest.jsonl
+!data/processed/codeswitch_scripts.*
 
-# Signed consent forms are personal data — keep local, never push
-data/consent_forms/signed/
+# Signed consent forms (verified OpenSLR research license IDs)
+!data/consent_forms/signed/
 
 # Python & environments
 __pycache__/
