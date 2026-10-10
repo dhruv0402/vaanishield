@@ -25,7 +25,8 @@ def sample_wav(tmp_path):
     wav_path = tmp_path / "sample.wav"
     sr = 16000
     duration = 2.0
-    audio = np.zeros(int(sr * duration), dtype=np.float32)
+    t = np.linspace(0, duration, int(sr * duration), endpoint=False)
+    audio = (0.3 * np.sin(2 * np.pi * 220.0 * t)).astype(np.float32)
     save_audio(str(wav_path), audio, sr)
     return str(wav_path)
 

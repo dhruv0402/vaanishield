@@ -32,7 +32,7 @@ jobs:
 
       - name: Run Unit & Integration Tests (pytest)
         run: |
-          pytest tests/ -v
+          PYTHONPATH=. pytest tests/ -v --tb=short
 
       - name: Verify Strict 8-Point Acceptance Gate
         run: |
