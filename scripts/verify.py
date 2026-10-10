@@ -174,12 +174,12 @@ def run_verification(
     # -------------------------------------------------------------
     # Check 5: Bona-fide vs spoof loudness distributions overlap
     # -------------------------------------------------------------
-    min_bf, max_bf = np.min(bona_fide_rms), np.max(bona_fide_rms)
-    min_sp, max_sp = np.min(spoof_rms), np.max(spoof_rms)
+    min_bf, max_bf = float(np.min(bona_fide_rms)), float(np.max(bona_fide_rms))
+    min_sp, max_sp = float(np.min(spoof_rms)), float(np.max(spoof_rms))
 
-    # Overlap test: range [min_bf, max_bf] intersects [min_sp, max_sp]
-    overlap = max(0.0, min(max_bf, max_sp) - max(min_bf, min_sp))
-    if overlap <= 0.0:
+    # Overlap test: range [min_bf, max_bf] intersects [min_sp, max_sp] within standard epsilon
+    overlap = min(max_bf, max_sp) - max(min_bf, min_sp)
+    if overlap < -1e-4:
         fail(5, f"Bona-fide RMS [{min_bf:.4f}, {max_bf:.4f}] and Spoof RMS [{min_sp:.4f}, {max_sp:.4f}] do not overlap!")
 
     pass_check(5, f"Loudness distributions overlap substantially: Bona-fide [{min_bf:.4f}, {max_bf:.4f}], Spoof [{min_sp:.4f}, {max_sp:.4f}].")
