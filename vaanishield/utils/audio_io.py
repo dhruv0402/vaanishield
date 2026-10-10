@@ -28,7 +28,18 @@ def load_audio(path: str, target_sr: int = 16000) -> Tuple[np.ndarray, int]:
         raise FileNotFoundError(f"Audio file not found: {path}")
 
     try:
-        audio, sr = librosa.load(path, sr=target_sr, mono=True)
+        data, sr = sf.read(path, dtype="float32")
+        if data.ndim > 1:
+            data = np.mean(data, axis=1)
+        if target_sr is not None and sr != target_sr:
+            import warnings
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=DeprecationWarning)
+                warnings.filterwarnings("ignore", message=".*pkg_resources.*")
+                audio = librosa.resample(data, orig_sr=sr, target_sr=target_sr)
+            sr = target_sr
+        else:
+            audio = data
     except Exception as e:
         raise ValueError(f"Corrupt or unreadable audio file: {path}. Error: {e}") from e
 
