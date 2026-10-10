@@ -12,7 +12,7 @@ accelerate>=0.30.0
 # --- Forced alignment & language ID ---
 # NOTE: Montreal Forced Aligner is installed via conda, not pip — see docs/TRD.md §Dataset.
 openai-whisper>=20231117    # fallback alignment / transcript source
-fasttext>=0.9.2             # lightweight token-level language ID (lid.176 model)
+fasttext-wheel>=0.9.2       # pre-compiled binary wheel for token-level language ID
 
 # --- Voice cloning / TTS (dataset construction only — never used at inference time) ---
 TTS>=0.22.0                 # Coqui TTS / XTTS

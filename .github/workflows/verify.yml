@@ -23,11 +23,11 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libsndfile1 ffmpeg
+          sudo apt-get install -y libsndfile1 ffmpeg build-essential python3-dev
 
       - name: Install Python Dependencies
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
 
       - name: Run Unit & Integration Tests (pytest)
