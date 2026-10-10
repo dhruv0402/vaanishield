@@ -4,8 +4,8 @@
     "heldout_samples": 50
   },
   "verdicts": {
-    "test_verdict": "VaaniShield demonstrates an EER of 0.3600 compared to best baseline 0.0600; baseline performance is higher on this configuration.",
-    "heldout_verdict": "VaaniShield demonstrates an EER of 0.3200 compared to best baseline 0.1400; baseline performance is higher on this configuration."
+    "test_verdict": "VaaniShield demonstrates an EER of 0.2000 compared to best baseline 0.0600; baseline performance is higher on this configuration.",
+    "heldout_verdict": "VaaniShield achieves comparable performance to baselines (EER 0.1800 [CI: 0.0714, 0.2915] vs best baseline 0.1400); differences are within statistical margin of error."
   },
   "models": {
     "baseline_a_generic": {
@@ -22,6 +22,26 @@
         },
         "breakdowns": {
           "noise_condition": {
+            "background_noise_injection": {
+              "count": 10,
+              "eer": 0.0,
+              "eer_ci": [
+                0.0,
+                0.0
+              ],
+              "precision": 1.0,
+              "recall": 0.6
+            },
+            "codec_compression": {
+              "count": 10,
+              "eer": 0.1,
+              "eer_ci": [
+                0.0,
+                0.506
+              ],
+              "precision": 1.0,
+              "recall": 0.6
+            },
             "amr_wb_compression": {
               "count": 10,
               "eer": 0.0,
@@ -41,26 +61,6 @@
               ],
               "precision": 1.0,
               "recall": 0.8
-            },
-            "codec_compression": {
-              "count": 10,
-              "eer": 0.1,
-              "eer_ci": [
-                0.0,
-                0.506
-              ],
-              "precision": 1.0,
-              "recall": 0.6
-            },
-            "background_noise_injection": {
-              "count": 10,
-              "eer": 0.0,
-              "eer_ci": [
-                0.0,
-                0.0
-              ],
-              "precision": 1.0,
-              "recall": 0.6
             },
             "clean": {
               "count": 10,
@@ -88,6 +88,26 @@
         },
         "breakdowns": {
           "noise_condition": {
+            "background_noise_injection": {
+              "count": 10,
+              "eer": 0.1,
+              "eer_ci": [
+                0.0,
+                0.7083
+              ],
+              "precision": 0.75,
+              "recall": 0.6
+            },
+            "codec_compression": {
+              "count": 10,
+              "eer": 0.1,
+              "eer_ci": [
+                0.0,
+                0.75
+              ],
+              "precision": 0.8333,
+              "recall": 1.0
+            },
             "amr_wb_compression": {
               "count": 10,
               "eer": 0.1,
@@ -107,26 +127,6 @@
               ],
               "precision": 0.8333,
               "recall": 1.0
-            },
-            "codec_compression": {
-              "count": 10,
-              "eer": 0.1,
-              "eer_ci": [
-                0.0,
-                0.75
-              ],
-              "precision": 0.8333,
-              "recall": 1.0
-            },
-            "background_noise_injection": {
-              "count": 10,
-              "eer": 0.1,
-              "eer_ci": [
-                0.0,
-                0.7083
-              ],
-              "precision": 0.75,
-              "recall": 0.6
             },
             "clean": {
               "count": 10,
@@ -156,6 +156,26 @@
         },
         "breakdowns": {
           "noise_condition": {
+            "background_noise_injection": {
+              "count": 10,
+              "eer": 0.0,
+              "eer_ci": [
+                0.0,
+                0.0
+              ],
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            "codec_compression": {
+              "count": 10,
+              "eer": 0.3,
+              "eer_ci": [
+                0.0,
+                0.5476
+              ],
+              "precision": 0.7143,
+              "recall": 1.0
+            },
             "amr_wb_compression": {
               "count": 10,
               "eer": 0.0,
@@ -175,26 +195,6 @@
               ],
               "precision": 0.8333,
               "recall": 1.0
-            },
-            "codec_compression": {
-              "count": 10,
-              "eer": 0.3,
-              "eer_ci": [
-                0.0,
-                0.5476
-              ],
-              "precision": 0.7143,
-              "recall": 1.0
-            },
-            "background_noise_injection": {
-              "count": 10,
-              "eer": 0.0,
-              "eer_ci": [
-                0.0,
-                0.0
-              ],
-              "precision": 0.0,
-              "recall": 0.0
             },
             "clean": {
               "count": 10,
@@ -222,6 +222,26 @@
         },
         "breakdowns": {
           "noise_condition": {
+            "background_noise_injection": {
+              "count": 10,
+              "eer": 0.1,
+              "eer_ci": [
+                0.0,
+                0.75
+              ],
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            "codec_compression": {
+              "count": 10,
+              "eer": 0.1,
+              "eer_ci": [
+                0.0,
+                0.625
+              ],
+              "precision": 0.8333,
+              "recall": 1.0
+            },
             "amr_wb_compression": {
               "count": 10,
               "eer": 0.0,
@@ -241,26 +261,6 @@
               ],
               "precision": 0.8333,
               "recall": 1.0
-            },
-            "codec_compression": {
-              "count": 10,
-              "eer": 0.1,
-              "eer_ci": [
-                0.0,
-                0.625
-              ],
-              "precision": 0.8333,
-              "recall": 1.0
-            },
-            "background_noise_injection": {
-              "count": 10,
-              "eer": 0.1,
-              "eer_ci": [
-                0.0,
-                0.75
-              ],
-              "precision": 0.0,
-              "recall": 0.0
             },
             "clean": {
               "count": 10,
@@ -280,64 +280,64 @@
       "test": {
         "overall": {
           "count": 50,
-          "eer": 0.36,
+          "eer": 0.2,
           "eer_ci": [
-            0.2585,
-            0.4536
+            0.0862,
+            0.3237
           ],
-          "precision": 0.5854,
-          "recall": 0.96
+          "precision": 0.7778,
+          "recall": 0.84
         },
         "breakdowns": {
           "noise_condition": {
-            "amr_wb_compression": {
-              "count": 10,
-              "eer": 0.4,
-              "eer_ci": [
-                0.2,
-                0.5
-              ],
-              "precision": 0.5556,
-              "recall": 1.0
-            },
-            "packet_loss_simulation": {
+            "background_noise_injection": {
               "count": 10,
               "eer": 0.3,
               "eer_ci": [
                 0.0,
-                0.5
+                0.8333
               ],
               "precision": 0.625,
               "recall": 1.0
             },
             "codec_compression": {
               "count": 10,
-              "eer": 0.3,
+              "eer": 0.2,
               "eer_ci": [
                 0.0,
-                0.6121
+                0.5424
               ],
-              "precision": 0.6667,
-              "recall": 0.8
+              "precision": 1.0,
+              "recall": 0.6
             },
-            "background_noise_injection": {
+            "amr_wb_compression": {
               "count": 10,
-              "eer": 0.4,
+              "eer": 0.0,
               "eer_ci": [
-                0.2,
-                0.5
+                0.0,
+                0.0
               ],
-              "precision": 0.5556,
+              "precision": 1.0,
               "recall": 1.0
+            },
+            "packet_loss_simulation": {
+              "count": 10,
+              "eer": 0.2,
+              "eer_ci": [
+                0.0,
+                0.5495
+              ],
+              "precision": 1.0,
+              "recall": 0.6
             },
             "clean": {
               "count": 10,
-              "eer": 0.4,
+              "eer": 0.3,
               "eer_ci": [
-                0.2,
-                0.5
+                0.0,
+                0.6905
               ],
-              "precision": 0.5556,
+              "precision": 0.625,
               "recall": 1.0
             }
           }
@@ -346,64 +346,64 @@
       "heldout_generalization": {
         "overall": {
           "count": 50,
-          "eer": 0.32,
+          "eer": 0.18,
           "eer_ci": [
-            0.2166,
-            0.413
+            0.0714,
+            0.2915
           ],
-          "precision": 0.6098,
-          "recall": 1.0
+          "precision": 0.7857,
+          "recall": 0.88
         },
         "breakdowns": {
           "noise_condition": {
-            "amr_wb_compression": {
+            "background_noise_injection": {
               "count": 10,
-              "eer": 0.4,
-              "eer_ci": [
-                0.1667,
-                0.5
-              ],
-              "precision": 0.5556,
-              "recall": 1.0
-            },
-            "packet_loss_simulation": {
-              "count": 10,
-              "eer": 0.2,
+              "eer": 0.3,
               "eer_ci": [
                 0.0,
-                0.4167
+                0.7083
               ],
-              "precision": 0.7143,
+              "precision": 0.625,
               "recall": 1.0
             },
             "codec_compression": {
               "count": 10,
-              "eer": 0.2,
+              "eer": 0.1,
               "eer_ci": [
                 0.0,
-                0.4167
+                0.5476
               ],
-              "precision": 0.7143,
+              "precision": 1.0,
+              "recall": 0.6
+            },
+            "amr_wb_compression": {
+              "count": 10,
+              "eer": 0.1,
+              "eer_ci": [
+                0.0,
+                0.2
+              ],
+              "precision": 0.8333,
               "recall": 1.0
             },
-            "background_noise_injection": {
+            "packet_loss_simulation": {
               "count": 10,
-              "eer": 0.4,
+              "eer": 0.0,
               "eer_ci": [
-                0.1667,
-                0.5
+                0.0,
+                0.0
               ],
-              "precision": 0.5556,
-              "recall": 1.0
+              "precision": 1.0,
+              "recall": 0.8
             },
             "clean": {
               "count": 10,
-              "eer": 0.6,
+              "eer": 0.0,
               "eer_ci": [
-                0.1667,
-                0.8333
+                0.0,
+                0.0
               ],
-              "precision": 0.5556,
+              "precision": 0.7143,
               "recall": 1.0
             }
           }
