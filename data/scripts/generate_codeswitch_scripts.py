@@ -115,40 +115,78 @@ SENTENCE_TEMPLATES = [
     {"text": "Mobile banking token revoke ho gaya hai, enter OTP sent to mobile.", "register": "fraud", "pair": "hi-en"},
     {"text": "Beti kidnap ho gayi hai, do not call police if you want her safe.", "register": "fraud", "pair": "hi-en"},
     {"text": "Secret investigation chal rahi hai, keep this conversation strictly confidential.", "register": "fraud", "pair": "hi-en"},
+
+    # --- KANNADA (kn-en) EXTENSION (Control & Fraud-register) ---
+    {"text": "Nanna laptop start agthilla, can you check the battery?", "register": "control", "pair": "kn-en"},
+    {"text": "Naanu market ge hogthiddene to buy fresh vegetables.", "register": "control", "pair": "kn-en"},
+    {"text": "Office mugisi gym ge hogbeku, need to do some workout.", "register": "control", "pair": "kn-en"},
+    {"text": "Manege guests barthiddare, room clean madbeku.", "register": "control", "pair": "kn-en"},
+    {"text": "Bega banni, lunch ge late aguththe.", "register": "control", "pair": "kn-en"},
+    {"text": "Nimma bank account block agide, verify your account details immediately.", "register": "fraud", "pair": "kn-en"},
+    {"text": "Electricity bill katilla andre power cut madthare, pay the surcharge now.", "register": "fraud", "pair": "kn-en"},
+    {"text": "Nimma maga accident agi hospital nalli iddare, transfer emergency funds right now.", "register": "fraud", "pair": "kn-en"},
+    {"text": "Customs officer call madthiddare, parcel release madoke pay clearance fee.", "register": "fraud", "pair": "kn-en"},
+    {"text": "OTP share madi bega, otherwise card will be permanently blocked.", "register": "fraud", "pair": "kn-en"},
+
+    # --- TAMIL (ta-en) EXTENSION (Control & Fraud-register) ---
+    {"text": "Enakku laptop on aagala, can you check the battery?", "register": "control", "pair": "ta-en"},
+    {"text": "Naan market poren to buy some fresh vegetables.", "register": "control", "pair": "ta-en"},
+    {"text": "Office mudichittu gym poganum, need to do some workout.", "register": "control", "pair": "ta-en"},
+    {"text": "Veetuku guests varanga, room clean pannanum.", "register": "control", "pair": "ta-en"},
+    {"text": "Seekiram vaanga, lunch time aachu.", "register": "control", "pair": "ta-en"},
+    {"text": "Unga bank account freeze aayiduchu, verify your details immediately.", "register": "fraud", "pair": "ta-en"},
+    {"text": "EB bill kattalana current cut panniduvanga, pay the penalty now.", "register": "fraud", "pair": "ta-en"},
+    {"text": "Unga paiyan accident aagi hospital la irukkaan, transfer money urgently.", "register": "fraud", "pair": "ta-en"},
+    {"text": "Customs department la irundhu pesurom, pay clearance fee to avoid arrest.", "register": "fraud", "pair": "ta-en"},
+    {"text": "OTP sollunga seekiram, card cancel aagum munnaadi.", "register": "fraud", "pair": "ta-en"},
 ]
 
-# Common Romanized Hindi words for rule-based token-level tagging fallback
-ROMANIZED_HINDI_WORDS = {
-    "mera", "meri", "mere", "main", "ja", "raha", "rahi", "hoon", "kal", "subah",
-    "ki", "hai", "chalo", "ke", "liye", "chalte", "hain", "bohot", "tha", "thi",
-    "the", "kar", "li", "yeh", "lag", "aaya", "aayi", "aaye", "baad", "peene",
-    "diya", "zyada", "naya", "nayi", "ne", "bola", "par", "rakhi", "rakha", "slow",
-    "chal", "khatam", "ho", "gaye", "purani", "dekh", "hua", "bache", "thandi",
-    "thoda", "kam", "karo", "nikaal", "utna", "gaya", "beta", "station", "mein",
-    "aapka", "aapki", "aapke", "hoga", "jayega", "jayegi", "badi", "phans", "karni",
-    "mile", "kidnap", "hone", "wala", "wali", "bhai", "bol", "pension", "chacha",
-    "papa", "tabiyat", "maang", "chahiye", "nahi", "ab", "abhi", "shuru", "beti",
-    "khel", "lene", "paas", "sirf", "jaldi", "door", "paani", "khana", "ghar"
+# Romanized vocabulary per language pair
+ROMANIZED_VOCAB = {
+    "hi": {
+        "mera", "meri", "mere", "main", "ja", "raha", "rahi", "hoon", "kal", "subah",
+        "ki", "hai", "chalo", "ke", "liye", "chalte", "hain", "bohot", "tha", "thi",
+        "the", "kar", "li", "yeh", "lag", "aaya", "aayi", "aaye", "baad", "peene",
+        "diya", "zyada", "naya", "nayi", "ne", "bola", "par", "rakhi", "rakha", "slow",
+        "chal", "khatam", "ho", "gaye", "purani", "dekh", "hua", "bache", "thandi",
+        "thoda", "kam", "karo", "nikaal", "utna", "gaya", "beta", "station", "mein",
+        "aapka", "aapki", "aapke", "hoga", "jayega", "jayegi", "badi", "phans", "karni",
+        "mile", "kidnap", "hone", "wala", "wali", "bhai", "bol", "pension", "chacha",
+        "papa", "tabiyat", "maang", "chahiye", "nahi", "ab", "abhi", "shuru", "beti",
+        "khel", "lene", "paas", "sirf", "jaldi", "door", "paani", "khana", "ghar"
+    },
+    "kn": {
+        "nanna", "namma", "naanu", "agthilla", "market", "ge", "hogthiddene", "office",
+        "mugisi", "hogbeku", "manege", "barthiddare", "madbeku", "bega", "banni",
+        "aguththe", "nimma", "agide", "katilla", "andre", "power", "madthare", "maga",
+        "agi", "nalli", "iddare", "madthiddare", "madoke", "madi", "beku", "illa"
+    },
+    "ta": {
+        "enakku", "on", "aagala", "naan", "poren", "office", "mudichittu", "poganum",
+        "veetuku", "varanga", "pannanum", "seekiram", "vaanga", "aachu", "unga",
+        "aayiduchu", "kattalana", "panniduvanga", "paiyan", "aagi", "la", "irukkaan",
+        "irundhu", "pesurom", "sollunga", "munnaadi", "kooda", "vendam"
+    }
 }
 
 
-def tag_tokens_heuristic(tokens: List[str]) -> List[str]:
-    """Tag tokens as 'hi' or 'en' based on vocabulary and linguistic heuristics.
-    Punctuation is stripped for lookup; words not in Romanized Hindi dictionary default to English.
-    """
+def tag_tokens_heuristic(tokens: List[str], lang_prefix: str = "hi") -> List[str]:
+    """Tag tokens as regional language or 'en' based on vocabulary and heuristics."""
+    vocab = ROMANIZED_VOCAB.get(lang_prefix, ROMANIZED_VOCAB["hi"])
     tags = []
-    prev_tag = "hi"
+    prev_tag = lang_prefix
     for tok in tokens:
         clean = tok.lower().strip(".,!?;:\"'()-")
         if not clean:
             tags.append(prev_tag)
             continue
-        if clean in ROMANIZED_HINDI_WORDS:
-            tag = "hi"
+        if clean in vocab:
+            tag = lang_prefix
         else:
             tag = "en"
         tags.append(tag)
         prev_tag = tag
+    return tags
     return tags
 
 
@@ -176,7 +214,8 @@ def generate_scripts(output_dir: str = "data/processed") -> List[Dict]:
     for idx, item in enumerate(SENTENCE_TEMPLATES):
         sentence_id = f"sent_{idx + 1:04d}"
         tokens = item["text"].split()
-        tags = tag_tokens_heuristic(tokens)
+        lang_prefix = item["pair"].split("-")[0]
+        tags = tag_tokens_heuristic(tokens, lang_prefix=lang_prefix)
         switches = find_token_switches(tokens, tags)
 
         rec = {
