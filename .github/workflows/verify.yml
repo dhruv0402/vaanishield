@@ -36,11 +36,11 @@ jobs:
 
       - name: Verify Strict 8-Point Acceptance Gate
         run: |
-          python scripts/verify.py
+          PYTHONPATH=. python scripts/verify.py
 
       - name: Validate Dataset Governance & G-Eval Metrics
         run: |
-          python scripts/validate_dataset.py
+          PYTHONPATH=. python scripts/validate_dataset.py
 
       - name: Build Web Dashboard (Vite Frontend)
         run: |
