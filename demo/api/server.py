@@ -239,9 +239,22 @@ async def analyze_audio(
             for exp in raw_explanations
         ]
 
-        is_spoof = prob_val >= 0.5
+        # Evaluate two-tier operational decision policy (0.48 review, 0.52 block)
+        tier_results = model.predict_operational_tier(
+            agg_boundary_vector.reshape(1, -1),
+            nulled_emb.reshape(1, -1),
+            tau_review=0.48,
+            tau_block=0.52,
+        )
+        tier_decision = tier_results[0]
+        decision_action = tier_decision["decision"]  # PASS, STEP_UP_REVIEW, BLOCK
+        risk_level = tier_decision["risk_tier"]      # LOW, SUSPICIOUS, CRITICAL
+
+        is_spoof = prob_val >= 0.50
         classification = "SPOOF / CLONED" if is_spoof else "BONA-FIDE HUMAN"
-        action_taken = "TRANSACTION_HELD_FOR_REVIEW" if is_spoof else "CALL_CLEARED"
+        action_taken = "TRANSACTION_FROZEN_BLOCK" if decision_action == "BLOCK" else (
+            "STEP_UP_VOICE_OTP_REQUIRED" if decision_action == "STEP_UP_REVIEW" else "CALL_CLEARED_PASS"
+        )
 
         # Log to SaaS Audit Trail
         call_id = f"call_{uuid.uuid4().hex[:8]}"
@@ -256,7 +269,7 @@ async def analyze_audio(
             "spoof_probability": round(prob_val, 3),
             "is_spoof": is_spoof,
             "action_taken": action_taken,
-            "alert_level": "CRITICAL" if prob_val > 0.75 else ("WARNING" if is_spoof else "SECURE"),
+            "alert_level": risk_level,
         }
         CALL_AUDIT_LOGS.insert(0, audit_record)
         if len(CALL_AUDIT_LOGS) > 50:
@@ -270,6 +283,13 @@ async def analyze_audio(
             "is_spoof": is_spoof,
             "spoof_probability": prob_val,
             "confidence_interval_95": [ci_low_val, ci_high_val],
+            "operational_decision": {
+                "decision": decision_action,
+                "risk_tier": risk_level,
+                "tau_review": 0.48,
+                "tau_block": 0.52,
+                "recommended_action": action_taken,
+            },
             "action_taken": action_taken,
             "audio_metadata": {
                 "duration_sec": round(duration_sec, 2),
