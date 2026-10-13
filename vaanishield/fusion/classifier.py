@@ -129,3 +129,37 @@ class FusionClassifier:
             ci_upper = np.percentile(resampled, (1.0 - alpha_tail) * 100, axis=0)
 
         return point_estimates, ci_lower, ci_upper
+
+    def predict_operational_tier(
+        self,
+        boundary_features: np.ndarray,
+        speaker_nulled_embeddings: np.ndarray,
+        tau_review: float = 0.48,
+        tau_block: float = 0.52,
+    ) -> list:
+        """Evaluate two-tier operational risk decision:
+        - 'PASS' (p < tau_review): Authenticated bona-fide speaker.
+        - 'STEP_UP_REVIEW' (tau_review <= p < tau_block): High-sensitivity flag (88% Recall).
+        - 'BLOCK' (p >= tau_block): High-precision fraud block (>=85% Precision).
+        """
+        probs, ci_lower, ci_upper = self.predict_with_ci(boundary_features, speaker_nulled_embeddings)
+        decisions = []
+        for p, low, high in zip(probs, ci_lower, ci_upper):
+            if p >= tau_block:
+                action = "BLOCK"
+                risk_level = "CRITICAL"
+            elif p >= tau_review:
+                action = "STEP_UP_REVIEW"
+                risk_level = "SUSPICIOUS"
+            else:
+                action = "PASS"
+                risk_level = "LOW"
+
+            decisions.append({
+                "spoof_probability": float(round(p, 4)),
+                "ci_95": [float(round(low, 4)), float(round(high, 4))],
+                "decision": action,
+                "risk_tier": risk_level,
+            })
+        return decisions
+

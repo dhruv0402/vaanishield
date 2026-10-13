@@ -88,3 +88,24 @@ def test_fusion_classifier_predict_with_ci_returns_valid_interval():
         assert 0.0 <= u <= 1.0
         assert l <= p <= u or np.isclose(l, p, atol=1e-3) or np.isclose(u, p, atol=1e-3)
 
+
+def test_predict_operational_tier_decision_tiers():
+    n_samples = 30
+    bf = np.random.uniform(0.0, 2.0, size=(n_samples, 10)).astype(np.float32)
+    sn = np.random.normal(0.0, 1.0, size=(n_samples, 768)).astype(np.float32)
+    labels = np.array([0] * 15 + [1] * 15)
+
+    clf = FusionClassifier(classifier_type="logistic_regression", calibration="isotonic")
+    clf.fit(bf, sn, labels)
+
+    tiers = clf.predict_operational_tier(bf[:3], sn[:3], tau_review=0.48, tau_block=0.52)
+    assert len(tiers) == 3
+    for t in tiers:
+        assert "decision" in t
+        assert t["decision"] in ["PASS", "STEP_UP_REVIEW", "BLOCK"]
+        assert "risk_tier" in t
+        assert t["risk_tier"] in ["LOW", "SUSPICIOUS", "CRITICAL"]
+        assert "ci_95" in t
+        assert len(t["ci_95"]) == 2
+
+

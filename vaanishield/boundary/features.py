@@ -45,6 +45,33 @@ class BoundaryFeatureVector:
     features: Dict[str, float]
 
 
+def denoise_audio_window(audio_window: np.ndarray, sr: int, reduction_factor: float = 0.75) -> np.ndarray:
+    """Apply spectral subtraction noise reduction to stabilize boundary prosodic features.
+
+    Subtracts stationary background noise floor estimated from minimum magnitude
+    frames, preventing pitch tracking failures in noisy telecom conditions while
+    preserving speech harmonics.
+    """
+    if len(audio_window) < int(0.04 * sr):
+        return audio_window
+
+    try:
+        n_fft = min(512, len(audio_window))
+        hop_length = n_fft // 4
+        stft = librosa.stft(audio_window, n_fft=n_fft, hop_length=hop_length)
+        mag, phase = np.abs(stft), np.angle(stft)
+
+        # Estimate stationary noise profile from bottom 15th percentile energy frames
+        noise_profile = np.percentile(mag, 15, axis=1, keepdims=True)
+        cleaned_mag = np.maximum(mag - reduction_factor * noise_profile, 0.05 * mag)
+
+        cleaned_stft = cleaned_mag * np.exp(1j * phase)
+        cleaned_audio = librosa.istft(cleaned_stft, hop_length=hop_length, length=len(audio_window))
+        return cleaned_audio.astype(np.float32)
+    except Exception:
+        return audio_window
+
+
 def extract_f0_reset_magnitude(audio_window: np.ndarray, sr: int) -> float:
     """Measure F0 pitch discontinuity across the midpoint of the boundary window.
 
@@ -222,12 +249,14 @@ def extract_boundary_features(
         if len(window) == 0:
             feat_dict = {name: 0.0 for name in FEATURE_NAMES}
         else:
+            # Apply spectral subtraction noise reduction to stabilize boundary prosodic features
+            clean_window = denoise_audio_window(window, sr)
             feat_dict = {
-                "f0_reset_magnitude": extract_f0_reset_magnitude(window, sr),
-                "energy_discontinuity": extract_energy_discontinuity(window, sr),
-                "phone_duration_ratio": extract_phone_duration_ratio(window, sr, speaker_baseline),
-                "formant_transition_smoothness": extract_formant_transition_smoothness(window, sr),
-                "mfcc_delta_magnitude": extract_mfcc_delta_magnitude(window, sr),
+                "f0_reset_magnitude": extract_f0_reset_magnitude(clean_window, sr),
+                "energy_discontinuity": extract_energy_discontinuity(clean_window, sr),
+                "phone_duration_ratio": extract_phone_duration_ratio(clean_window, sr, speaker_baseline),
+                "formant_transition_smoothness": extract_formant_transition_smoothness(clean_window, sr),
+                "mfcc_delta_magnitude": extract_mfcc_delta_magnitude(clean_window, sr),
             }
 
         vectors.append(BoundaryFeatureVector(codeswitch_point=pt, features=feat_dict))
