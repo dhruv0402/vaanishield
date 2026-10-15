@@ -34,6 +34,19 @@ CHECKPOINT_PATH = "checkpoints/fusion_checkpoint.pkl"
 MODEL = None
 PROJECTOR = None
 CFG = None
+WHISPER_MODEL = None
+
+def get_whisper():
+    global WHISPER_MODEL
+    if WHISPER_MODEL is None:
+        try:
+            import whisper
+            # Load the base multilingual model (supports Hindi, Tamil, Telugu, Kannada, English)
+            WHISPER_MODEL = whisper.load_model("base")
+        except Exception as e:
+            print(f"[ASR Warning] Could not load whisper model: {e}")
+            WHISPER_MODEL = False
+    return WHISPER_MODEL if WHISPER_MODEL is not False else None
 
 # In-Memory Enterprise SaaS Multi-Tenant Datastores
 API_KEYS = {
@@ -212,7 +225,27 @@ async def analyze_audio(
         audio, sr = load_audio(audio_path)
         duration_sec = float(len(audio) / sr)
 
-        effective_transcript = transcript.strip() if transcript and transcript.strip() else "Mera laptop start nahi ho raha, can you check the battery?"
+        transcription_method = "user_provided"
+        if transcript and transcript.strip():
+            effective_transcript = transcript.strip()
+        else:
+            whisper_engine = get_whisper()
+            if whisper_engine:
+                try:
+                    asr_res = whisper_engine.transcribe(audio_path)
+                    effective_transcript = asr_res.get("text", "").strip()
+                    transcription_method = "whisper_asr_auto"
+                except Exception as asr_err:
+                    print(f"[ASR Error] Transcription failed: {asr_err}")
+                    effective_transcript = "Mera laptop start nahi ho raha, can you check the battery?"
+                    transcription_method = "fallback_default"
+            else:
+                effective_transcript = "Mera laptop start nahi ho raha, can you check the battery?"
+                transcription_method = "fallback_default"
+
+        if not effective_transcript:
+            effective_transcript = "Mera laptop start nahi ho raha, can you check the battery?"
+
         tokens = [t.strip() for t in effective_transcript.split() if t.strip()]
 
         points = find_codeswitch_points(
@@ -305,6 +338,8 @@ async def analyze_audio(
                 "recommended_action": action_taken,
             },
             "action_taken": action_taken,
+            "transcription": effective_transcript,
+            "transcription_method": transcription_method,
             "audio_metadata": {
                 "duration_sec": round(duration_sec, 2),
                 "sample_rate_hz": sr,

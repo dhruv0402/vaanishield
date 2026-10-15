@@ -814,6 +814,19 @@ export default function App() {
                       {analysisResult.audio_metadata.detected_boundary_count}
                     </div>
 
+                    {analysisResult.transcription && (
+                      <div style={{ marginBottom: "16px", padding: "10px 12px", background: "#171923", border: "1px solid #2d3748", borderRadius: "4px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                          <span style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", color: "#63b3ed" }}>
+                            Transcribed Speech ({analysisResult.transcription_method === "whisper_asr_auto" ? "OpenAI Whisper ASR" : "Provided"})
+                          </span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: "13px", color: "#e2e8f0", fontStyle: "italic" }}>
+                          "{analysisResult.transcription}"
+                        </p>
+                      </div>
+                    )}
+
                     <h3 style={{ fontSize: "12px", textTransform: "uppercase", color: "#cbd5e0", marginBottom: "8px" }}>
                       Acoustic Diagnostic Seam Attribution & Timeline
                     </h3>
