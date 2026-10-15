@@ -42,6 +42,7 @@ class CodeSwitchPoint:
 _DEVANAGARI_RE = re.compile(r"[\u0900-\u097F]")
 _KANNADA_RE = re.compile(r"[\u0C80-\u0CFF]")
 _TAMIL_RE = re.compile(r"[\u0B80-\u0BFF]")
+_TELUGU_RE = re.compile(r"[\u0C00-\u0C7F]")
 
 # Common Romanized Hindi lexicon for token LID fallback
 _ROMANIZED_HINDI_LEXICON = {
@@ -56,22 +57,41 @@ _ROMANIZED_HINDI_LEXICON = {
     "papa", "tabiyat", "maang", "chahiye", "nahi", "ab", "abhi", "shuru", "beti",
     "khel", "lene", "paas", "sirf", "jaldi", "door", "paani", "khana", "ghar",
     "se", "ko", "ka", "kuch", "apna", "apni", "apne", "hum", "tum", "aap", "woh",
-    "bhi", "toh", "lekin", "magar", "kyun", "kaise", "kahan", "kab", "kya"
+    "bhi", "toh", "lekin", "magar", "kyun", "kaise", "kahan", "kab", "kya", "suno",
+    "dekho", "baat", "karo", "samjha", "samjhe", "accha", "theek", "batao", "bataiye"
 }
 
-# Common Romanized Kannada lexicon
+# Comprehensive Romanized Kannada lexicon
 _ROMANIZED_KANNADA_LEXICON = {
     "nanna", "nange", "naanu", "beku", "beda", "hege", "yaake", "elli", "illi",
-    "banni", "hogona", "maadi", "agalla", "ide", "illa", "tumba", "oota",
-    "nodi", "helu", "ivattu", "naale", "dayavittu", "kodi", "gottu", "gottilla"
+    "banni", "hogona", "maadi", "agalla", "ide", "illa", "tumba", "oota", "houda",
+    "nodi", "helu", "ivattu", "naale", "dayavittu", "kodi", "gottu", "gottilla",
+    "namaskara", "yenu", "yaaru", "barthira", "barthini", "kelsa", "mane", "oora",
+    "kollu", "madona", "kodu", "thago", "swalpa", "sari", "chennagide", "kodi",
+    "idu", "adhu", "avaru", "ivaru", "bere", "munde", "hinde", "hogi", "banni",
+    "yellaru", "yella", "yavaga", "estu", "hegidira", "ootaaytha", "kelasa"
 }
 
-# Common Romanized Tamil lexicon
+# Comprehensive Romanized Tamil lexicon (Tanglish conversational & agglutinative roots)
 _ROMANIZED_TAMIL_LEXICON = {
-    "enaku", "enna", "epdi", "enga", "inge", "ange", "vaanga", "ponga", "pannunga",
-    "venum", "vendaam", "iruku", "illa", "rombavum", "saapadu", "paaru", "sollu",
-    "inniku", "naalaiku", "dayavuseithu", "kodu", "theriyum", "theriyaathu", "aamaa"
+    "enaku", "enakku", "enna", "epdi", "eppadi", "enga", "enge", "inge", "ange",
+    "vaanga", "vanga", "ponga", "pannunga", "pannalam", "panniten", "pannuren",
+    "venum", "vendam", "vendaam", "iruku", "irukku", "iruke", "irukka", "illa",
+    "illai", "rombavum", "romba", "saapadu", "sapadu", "paaru", "paathiya",
+    "sollu", "sollunga", "inniku", "naalaiku", "dayavuseithu", "kodu", "kodunga",
+    "theriyum", "theriyaathu", "theriyadhu", "aamaa", "aam", "seri", "sari",
+    "thambi", "anna", "akka", "amma", "appa", "kadai", "veedu", "kaasu", "panam",
+    "konjam", "podhum", "mudiyum", "mudiyathu", "mudiyadhu", "paravala", "paravallai",
+    "pesunga", "kelunga", "vango", "pongo", "pathu", "therinju", "puriyala", "puriyudha",
+    "aprom", "apparam", "eppo", "ippo", "appo", "edhukku", "ethukku", "yaaru", "yedhu",
+    "idhu", "adhu", "idhula", "adhula", "idhuva", "adhuva", "ivlo", "avlo", "avalavu"
 }
+
+# Common Dravidian agglutinative suffixes for code-mixed speech
+_DRAVIDIAN_SUFFIXES = (
+    "unga", "anga", "la", "le", "ku", "kku", "oda", "ode", "laam", "lam",
+    "dhu", "thu", "aachu", "aayiduchi", "aayithu", "aagidhe", "odu"
+)
 
 
 def tag_token_languages(transcript_tokens: List[str], lid_model: str = "fasttext-lid176") -> List[str]:
@@ -102,6 +122,8 @@ def tag_token_languages(transcript_tokens: List[str], lid_model: str = "fasttext
             tag = "kn"
         elif _TAMIL_RE.search(clean):
             tag = "ta"
+        elif _TELUGU_RE.search(clean):
+            tag = "te"
         # Pure digit/number -> inherit previous tag
         elif clean.isdigit():
             tag = prev_tag
@@ -112,6 +134,10 @@ def tag_token_languages(transcript_tokens: List[str], lid_model: str = "fasttext
             tag = "kn"
         elif clean in _ROMANIZED_TAMIL_LEXICON:
             tag = "ta"
+        # Agglutinative Dravidian morphological suffix check (e.g. 'pannit-anga', 'officela', 'room-laam')
+        elif any(clean.endswith(suf) and len(clean) > len(suf) + 2 for suf in _DRAVIDIAN_SUFFIXES):
+            # If suffix matches Tanglish/Kannada conversational markers
+            tag = "ta" if prev_tag == "ta" else ("kn" if prev_tag == "kn" else "ta")
         else:
             tag = "en"
 
@@ -137,20 +163,44 @@ def align_tokens_to_audio(
     audio, sr = load_audio(audio_path)
     total_duration = len(audio) / sr
 
-    # Duration-proportional character-weighted alignment
-    # In full whisper backend, whisper.load_model() produces word_timestamps.
-    # Here we allocate realistic phonetic duration proportional to token length
-    # with silence padding at beginning and end.
-    n_tokens = len(transcript_tokens)
-    token_weights = [max(len(tok), 2) for tok in transcript_tokens]
-    total_weight = sum(token_weights)
+    # Acoustic Energy Envelope & VAD Guidance:
+    # Instead of dividing purely by character count across the file duration,
+    # compute short-term acoustic energy to detect leading/trailing pauses,
+    # silent pauses between phrases, and allocate duration according to
+    # phonetic sonority (vowel nucleus count + consonant coda).
+    import librosa
+    frame_len = max(16, int(0.025 * sr))
+    hop_len = max(8, int(0.010 * sr))
+    rms_env = librosa.feature.rms(y=audio, frame_length=frame_len, hop_length=hop_len)[0]
+    rms_times = librosa.frames_to_time(np.arange(len(rms_env)), sr=sr, hop_length=hop_len)
 
-    # 100ms silence margin at boundaries
-    margin = min(0.1, total_duration * 0.05)
-    speech_duration = max(0.01, total_duration - 2 * margin)
+    # Detect speech onset and offset using energy threshold
+    energy_thresh = max(float(np.mean(rms_env)) * 0.15, 1e-4)
+    active_frames = np.where(rms_env > energy_thresh)[0]
+
+    if len(active_frames) > 0:
+        start_speech = float(max(0.0, rms_times[active_frames[0]] - 0.05))
+        end_speech = float(min(total_duration, rms_times[active_frames[-1]] + 0.05))
+    else:
+        start_speech = min(0.1, total_duration * 0.05)
+        end_speech = max(total_duration - 0.1, total_duration * 0.95)
+
+    speech_duration = max(0.1, end_speech - start_speech)
+
+    # Phonetic weight: vowel nuclei (syllables) dominate duration in Indic/Dravidian speech
+    vowels = set("aeiouāīūēōaiouáéíóú")
+    token_weights = []
+    for tok in transcript_tokens:
+        clean_tok = tok.lower()
+        v_count = sum(1 for ch in clean_tok if ch in vowels)
+        # Weight by vowel count + base length
+        weight = max(v_count * 2.0 + len(clean_tok) * 0.5, 1.5)
+        token_weights.append(weight)
+
+    total_weight = sum(token_weights) if token_weights else 1.0
 
     aligned: List[Tuple[str, float, float]] = []
-    current_time = margin
+    current_time = start_speech
 
     for tok, weight in zip(transcript_tokens, token_weights):
         duration = (weight / total_weight) * speech_duration

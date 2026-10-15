@@ -119,6 +119,20 @@ def get_pipeline():
 def health():
     return {"status": "ok", "service": "VaaniShield Detection API"}
 
+@app.get("/api/sessions")
+def get_sessions():
+    return {
+        "status": "active",
+        "active_sessions": [
+            {
+                "session_id": "sess_default_01",
+                "org": "State Bank Security Ops",
+                "tier": "Enterprise Multi-Stream Gate",
+                "status": "PROTECTED",
+            }
+        ]
+    }
+
 @app.get("/api/samples")
 def get_samples():
     return [
