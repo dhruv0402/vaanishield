@@ -774,6 +774,75 @@ export default function App() {
 
                 {analysisResult && (
                   <div>
+                    {/* Operational Risk Tier Callout */}
+                    {analysisResult.operational_decision && (
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          padding: "12px 16px",
+                          marginBottom: "16px",
+                          borderRadius: "4px",
+                          border: `1px solid ${
+                            analysisResult.operational_decision.decision === "BLOCK"
+                              ? "#e53e3e"
+                              : analysisResult.operational_decision.decision === "STEP_UP_REVIEW"
+                              ? "#dd6b20"
+                              : "#38a169"
+                          }`,
+                          background:
+                            analysisResult.operational_decision.decision === "BLOCK"
+                              ? "rgba(229, 62, 62, 0.12)"
+                              : analysisResult.operational_decision.decision === "STEP_UP_REVIEW"
+                              ? "rgba(221, 107, 32, 0.12)"
+                              : "rgba(56, 161, 105, 0.12)",
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontSize: "11px", textTransform: "uppercase", fontWeight: "bold", color: "#a0aec0" }}>
+                            OPERATIONAL GATE POLICY
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "18px",
+                              fontWeight: "bold",
+                              color:
+                                analysisResult.operational_decision.decision === "BLOCK"
+                                  ? "#fc8181"
+                                  : analysisResult.operational_decision.decision === "STEP_UP_REVIEW"
+                                  ? "#fbd38d"
+                                  : "#68d391",
+                            }}
+                          >
+                            {analysisResult.operational_decision.decision === "BLOCK" && "⛔ BLOCK & FREEZE TRANSACTION"}
+                            {analysisResult.operational_decision.decision === "STEP_UP_REVIEW" && "⚠️ STEP-UP VOICE OTP REQUIRED"}
+                            {analysisResult.operational_decision.decision === "PASS" && "✅ CALL CLEARED & AUTHENTICATED"}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <span
+                            style={{
+                              display: "inline-block",
+                              padding: "4px 8px",
+                              fontSize: "11px",
+                              fontWeight: "bold",
+                              borderRadius: "3px",
+                              background:
+                                analysisResult.operational_decision.decision === "BLOCK"
+                                  ? "#742a2a"
+                                  : analysisResult.operational_decision.decision === "STEP_UP_REVIEW"
+                                  ? "#7b341e"
+                                  : "#1c4532",
+                              color: "#fff",
+                            }}
+                          >
+                            RISK TIER: {analysisResult.operational_decision.risk_tier}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="metrics-row">
                       <div className="metric-box">
                         <div className="metric-label">Spoof Probability</div>

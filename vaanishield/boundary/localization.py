@@ -84,7 +84,21 @@ _ROMANIZED_TAMIL_LEXICON = {
     "konjam", "podhum", "mudiyum", "mudiyathu", "mudiyadhu", "paravala", "paravallai",
     "pesunga", "kelunga", "vango", "pongo", "pathu", "therinju", "puriyala", "puriyudha",
     "aprom", "apparam", "eppo", "ippo", "appo", "edhukku", "ethukku", "yaaru", "yedhu",
-    "idhu", "adhu", "idhula", "adhula", "idhuva", "adhuva", "ivlo", "avlo", "avalavu"
+    "idhu", "adhu", "idhula", "adhula", "idhuva", "adhuva", "ivlo", "avlo", "avalavu",
+    "indha", "andha", "indha", "rendu", "onnu", "moonu", "naalu", "anju", "aaru",
+    "solren", "varren", "poren", "mudiyala", "kooda", "mattam", "mattum", "irundha",
+    "va", "po", "dosa", "idly", "idli", "sambhar", "sambar", "rasam", "vadai", "vada",
+    "kaapi", "thanni", "ooru", "thirumba", "seekiram", "nalla", "nallaare", "kandippa"
+}
+
+# Comprehensive Romanized Telugu lexicon
+_ROMANIZED_TELUGU_LEXICON = {
+    "naku", "naaku", "enti", "ela", "ekkada", "ikkada", "akkada", "randi", "vellandi",
+    "cheyandi", "kavali", "vaddu", "undhi", "ledu", "chala", "bavundi", "cheppandi",
+    "eroju", "repu", "dayachesi", "ivvandi", "telusu", "teliyadu", "avunu", "sare",
+    "anna", "chelli", "amma", "nanna", "illu", "dabbulu", "konchem", "chalu",
+    "vachanu", "velthanu", "ippudu", "appudu", "endhuku", "evaru", "edhi", "adhi",
+    "idhi", "andaru", "annee", "chudu", "matladandi", "tinnara", "annam", "cheyali"
 }
 
 # Common Dravidian agglutinative suffixes for code-mixed speech
@@ -134,6 +148,8 @@ def tag_token_languages(transcript_tokens: List[str], lid_model: str = "fasttext
             tag = "kn"
         elif clean in _ROMANIZED_TAMIL_LEXICON:
             tag = "ta"
+        elif clean in _ROMANIZED_TELUGU_LEXICON:
+            tag = "te"
         # Agglutinative Dravidian morphological suffix check (e.g. 'pannit-anga', 'officela', 'room-laam')
         elif any(clean.endswith(suf) and len(clean) > len(suf) + 2 for suf in _DRAVIDIAN_SUFFIXES):
             # If suffix matches Tanglish/Kannada conversational markers
