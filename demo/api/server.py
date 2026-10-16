@@ -173,11 +173,12 @@ def get_samples():
     ]
 
 @app.get("/api/audio/{sample_id}")
-def get_sample_audio(sample_id: str):
     sample_map = {
         "sample_bonafide": "data/raw/spk_1119_1119_020.wav",
         "sample_cloned": "data/processed/train_clones/spk_1119_utt_000_xtts.wav",
-        "sample_codec": "data/processed/augmented/spk_1119_utt_000_xtts_codec.wav"
+        "sample_codec": "data/processed/augmented/spk_1119_utt_000_xtts_codec.wav",
+        "sample_kannada_bonafide": "data/raw/spk_2131_2131_003.wav",
+        "sample_tamil_cloned": "data/processed/train_clones/spk_2131_utt_005_xtts.wav",
     }
     audio_path = sample_map.get(sample_id)
     if not audio_path or not os.path.exists(audio_path):
@@ -213,7 +214,9 @@ async def analyze_audio(
         sample_map = {
             "sample_bonafide": "data/raw/spk_1119_1119_020.wav",
             "sample_cloned": "data/processed/train_clones/spk_1119_utt_000_xtts.wav",
-            "sample_codec": "data/processed/augmented/spk_1119_utt_000_xtts_codec.wav"
+            "sample_codec": "data/processed/augmented/spk_1119_utt_000_xtts_codec.wav",
+            "sample_kannada_bonafide": "data/raw/spk_2131_2131_003.wav",
+            "sample_tamil_cloned": "data/processed/train_clones/spk_2131_utt_005_xtts.wav",
         }
         audio_path = sample_map.get(sample_id)
         if not audio_path or not os.path.exists(audio_path):

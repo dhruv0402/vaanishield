@@ -533,11 +533,48 @@ export default function App() {
           <div>
             {/* Above the Fold Hero & Direct CTA */}
             <section className="hero-section">
+              <div style={{ display: "inline-block", padding: "3px 8px", background: "#1a202c", border: "1px solid #3182ce", fontSize: "11px", color: "#63b3ed", fontWeight: "bold", textTransform: "uppercase", marginBottom: "8px" }}>
+                AI Voice Fraud Defense System &bull; Research & Telephony Edition
+              </div>
               <h1 className="hero-title">Acoustic Seam Localization for Code-Switched Speech</h1>
               <p className="hero-desc">
-                Detects AI-cloned voices in Hindi-English (Hinglish) telephone audio by isolating intra-sentence
-                boundary pitch jumps, formant roughness, and orthogonal speaker-nulled acoustic artifacts.
+                Detects AI-cloned voices in multi-lingual Indian telephone audio (Hindi, Kannada, Tamil, Telugu, and English) 
+                by isolating intra-sentence language transition artifacts: F0 pitch resets, formant roughness, and orthogonal speaker-nulled embeddings.
               </p>
+
+              {/* Step-by-Step Educational Flow for Evaluators & Professors */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "10px", margin: "16px 0", textAlign: "left" }}>
+                <div style={{ background: "#171923", border: "1px solid #2d3748", padding: "12px", borderLeft: "3px solid #63b3ed" }}>
+                  <div style={{ fontSize: "10px", fontWeight: "bold", color: "#63b3ed", textTransform: "uppercase", marginBottom: "2px" }}>
+                    Step 1: Input & Ingestion
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#edf2f7", fontWeight: 600 }}>Audio / Mic & Automatic ASR</div>
+                  <div style={{ fontSize: "11px", color: "#a0aec0", marginTop: "3px" }}>
+                    Select preset benchmarks, upload a .wav file, or speak into your mic. Whisper ASR transcribes on-the-fly.
+                  </div>
+                </div>
+
+                <div style={{ background: "#171923", border: "1px solid #2d3748", padding: "12px", borderLeft: "3px solid #dd6b20" }}>
+                  <div style={{ fontSize: "10px", fontWeight: "bold", color: "#dd6b20", textTransform: "uppercase", marginBottom: "2px" }}>
+                    Step 2: Acoustic Seam Analysis
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#edf2f7", fontWeight: 600 }}>Boundary Phonetics & SNAP</div>
+                  <div style={{ fontSize: "11px", color: "#a0aec0", marginTop: "3px" }}>
+                    Extracts intra-utterance switch seams (±300ms windows) and removes speaker bias via null-space projection.
+                  </div>
+                </div>
+
+                <div style={{ background: "#171923", border: "1px solid #2d3748", padding: "12px", borderLeft: "3px solid #48bb78" }}>
+                  <div style={{ fontSize: "10px", fontWeight: "bold", color: "#48bb78", textTransform: "uppercase", marginBottom: "2px" }}>
+                    Step 3: Decision & Audit
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#edf2f7", fontWeight: 600 }}>Two-Tier Gate (Pass / Block)</div>
+                  <div style={{ fontSize: "11px", color: "#a0aec0", marginTop: "3px" }}>
+                    Calibrated logistic fusion assigns fraud probability, confidence interval, and actionable operational verdict.
+                  </div>
+                </div>
+              </div>
+
               <div className="hero-cta-bar">
                 <button
                   type="button"
@@ -896,9 +933,27 @@ export default function App() {
                       </div>
                     )}
 
-                    <h3 style={{ fontSize: "12px", textTransform: "uppercase", color: "#cbd5e0", marginBottom: "8px" }}>
-                      Acoustic Diagnostic Seam Attribution & Timeline
-                    </h3>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                      <h3 style={{ fontSize: "12px", textTransform: "uppercase", color: "#cbd5e0", margin: 0 }}>
+                        Acoustic Diagnostic Seam Attribution & Timeline
+                      </h3>
+                      <span style={{ fontSize: "11px", color: "#a0aec0" }}>
+                        Why this matters: Neural synthesizers leave physical discontinuities at language switches.
+                      </span>
+                    </div>
+
+                    {/* Evaluator Feature Guide Callout */}
+                    <div style={{ background: "#1a202c", border: "1px solid #2d3748", padding: "10px 12px", marginBottom: "12px", fontSize: "11px", color: "#cbd5e0" }}>
+                      <div style={{ fontWeight: "bold", color: "#63b3ed", marginBottom: "4px" }}>
+                        ACADEMIC ACOUSTIC FEATURES EVALUATED AT EACH SWITCH SEAM:
+                      </div>
+                      <ul style={{ margin: "0 0 0 16px", padding: 0, lineHeight: 1.6 }}>
+                        <li><strong>F0 Pitch Reset:</strong> Human speakers preserve natural intonation; clones exhibit unnatural instantaneous pitch jumps.</li>
+                        <li><strong>Energy Discontinuity:</strong> Frame-to-frame RMS energy drop across language switch boundaries.</li>
+                        <li><strong>Formant Smoothness (F1/F2):</strong> Vocal tract physical inertia prevents instantaneous vowel formant changes in humans.</li>
+                        <li><strong>SNAP Speaker-Nulling:</strong> Removes speaker identity bias to prevent false positives on unfamiliar accents.</li>
+                      </ul>
+                    </div>
 
                     {/* Visual Boundary Timeline */}
                     {analysisResult.explanations.length > 0 && (
