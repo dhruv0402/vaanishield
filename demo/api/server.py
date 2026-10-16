@@ -173,6 +173,7 @@ def get_samples():
     ]
 
 @app.get("/api/audio/{sample_id}")
+def get_sample_audio(sample_id: str):
     sample_map = {
         "sample_bonafide": "data/raw/spk_1119_1119_020.wav",
         "sample_cloned": "data/processed/train_clones/spk_1119_utt_000_xtts.wav",
