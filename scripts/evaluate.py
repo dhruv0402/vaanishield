@@ -54,6 +54,8 @@ def evaluate_models(
     with open(dataset_manifest, "r", encoding="utf-8") as f:
         all_records = [json.loads(line) for line in f]
 
+    train_records = [r for r in all_records if r.get("split") == "train"]
+    val_records = [r for r in all_records if r.get("split") == "val"]
     test_records = [r for r in all_records if r.get("split") == "test"]
     heldout_records = [r for r in all_records if r.get("split") == "heldout"]
 
@@ -62,19 +64,28 @@ def evaluate_models(
     if not heldout_records:
         raise ValueError("No heldout records found in manifest")
 
-    # Assert dual-class in both evaluation sets
-    test_labels = set(r["label"] for r in test_records)
-    heldout_labels = set(r["label"] for r in heldout_records)
-    if not (("bona_fide" in test_labels or "bonafide" in test_labels) and "spoof" in test_labels):
-        raise ValueError(f"Test set missing one of the classes: {test_labels}")
-    if not (("bona_fide" in heldout_labels or "bonafide" in heldout_labels) and "spoof" in heldout_labels):
-        raise ValueError(f"Heldout set missing one of the classes: {heldout_labels}")
+    # Assert dual-class in evaluation sets
+    for sp_name, sp_recs in [("val", val_records), ("test", test_records), ("heldout", heldout_records)]:
+        if not sp_recs:
+            continue
+        sp_labels = set(r["label"] for r in sp_recs)
+        if not (("bona_fide" in sp_labels or "bonafide" in sp_labels) and "spoof" in sp_labels):
+            raise ValueError(f"Split '{sp_name}' missing one of the classes: {sp_labels}")
+
+    val_audio_paths = [r["audio_path"] for r in val_records]
+    y_val = np.array([1 if r.get("label") == "spoof" else 0 for r in val_records], dtype=np.int32)
+    val_speakers = np.array([r.get("speaker_id", "unknown") for r in val_records])
+    val_breakdowns = {
+        "noise_condition": [r.get("noise_condition", "clean") for r in val_records],
+        "language_pair": [r.get("language_pair", "ta-en") for r in val_records],
+    }
 
     test_audio_paths = [r["audio_path"] for r in test_records]
     y_test = np.array([1 if r.get("label") == "spoof" else 0 for r in test_records], dtype=np.int32)
     test_speakers = np.array([r.get("speaker_id", "unknown") for r in test_records])
     test_breakdowns = {
         "noise_condition": [r.get("noise_condition", "clean") for r in test_records],
+        "language_pair": [r.get("language_pair", "hi-en") for r in test_records],
     }
 
     heldout_audio_paths = [r["audio_path"] for r in heldout_records]
@@ -82,6 +93,7 @@ def evaluate_models(
     heldout_speakers = np.array([r.get("speaker_id", "unknown") for r in heldout_records])
     heldout_breakdowns = {
         "noise_condition": [r.get("noise_condition", "clean") for r in heldout_records],
+        "language_pair": [r.get("language_pair", "hi-en") for r in heldout_records],
     }
 
     # Load models
@@ -97,10 +109,12 @@ def evaluate_models(
         bb_model: BaselineBIndianAccent = pickle.load(f)["model"]
 
     # Predict Baseline A
+    preds_ba_val = ba_model.predict_proba(val_audio_paths)[:, 1] if val_records else np.array([])
     preds_ba_test = ba_model.predict_proba(test_audio_paths)[:, 1]
     preds_ba_heldout = ba_model.predict_proba(heldout_audio_paths)[:, 1]
 
     # Predict Baseline B
+    preds_bb_val = bb_model.predict_proba(val_audio_paths)[:, 1] if val_records else np.array([])
     preds_bb_test = bb_model.predict_proba(test_audio_paths)[:, 1]
     preds_bb_heldout = bb_model.predict_proba(heldout_audio_paths)[:, 1]
 
@@ -122,9 +136,15 @@ def evaluate_models(
             mat.append(agg)
         return np.array(mat, dtype=np.float32)
 
+    val_bmat = extract_bmat(val_records) if val_records else np.array([])
     test_bmat = extract_bmat(test_records)
     heldout_bmat = extract_bmat(heldout_records)
 
+    val_sn = (
+        projector.project(np.array([projector.embed(p) for p in val_audio_paths], dtype=np.float32))
+        if val_records
+        else np.array([])
+    )
     test_sn = projector.project(
         np.array([projector.embed(p) for p in test_audio_paths], dtype=np.float32)
     )
@@ -132,6 +152,7 @@ def evaluate_models(
         np.array([projector.embed(p) for p in heldout_audio_paths], dtype=np.float32)
     )
 
+    preds_fusion_val = fusion_model.predict_proba(val_bmat, val_sn)[:, 1] if val_records else np.array([])
     preds_fusion_test = fusion_model.predict_proba(test_bmat, test_sn)[:, 1]
     preds_fusion_heldout = fusion_model.predict_proba(heldout_bmat, heldout_sn)[:, 1]
 
@@ -140,6 +161,15 @@ def evaluate_models(
     with open(scores_csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["utterance_id", "model", "score", "label", "condition", "split", "speaker_id"])
+
+        for i, r in enumerate(val_records):
+            uid = r["utterance_id"]
+            cond = r.get("noise_condition", "clean")
+            spk = r.get("speaker_id", "unknown")
+            lbl = y_val[i]
+            writer.writerow([uid, "baseline_a", f"{preds_ba_val[i]:.6f}", lbl, cond, "val", spk])
+            writer.writerow([uid, "baseline_b", f"{preds_bb_val[i]:.6f}", lbl, cond, "val", spk])
+            writer.writerow([uid, "fusion", f"{preds_fusion_val[i]:.6f}", lbl, cond, "val", spk])
 
         for i, r in enumerate(test_records):
             uid = r["utterance_id"]
@@ -161,15 +191,29 @@ def evaluate_models(
 
     logger.info(f"Wrote scores single source of truth to {scores_csv_path}")
 
-    # Evaluate by breakdown using cluster bootstrap
+    # Evaluate by breakdown using cluster/sample bootstrap
+    eval_ba_val = evaluate_by_breakdown(preds_ba_val, y_val, val_breakdowns, clusters=val_speakers) if val_records else {}
     eval_ba_test = evaluate_by_breakdown(preds_ba_test, y_test, test_breakdowns, clusters=test_speakers)
     eval_ba_heldout = evaluate_by_breakdown(preds_ba_heldout, y_heldout, heldout_breakdowns, clusters=heldout_speakers)
 
+    eval_bb_val = evaluate_by_breakdown(preds_bb_val, y_val, val_breakdowns, clusters=val_speakers) if val_records else {}
     eval_bb_test = evaluate_by_breakdown(preds_bb_test, y_test, test_breakdowns, clusters=test_speakers)
     eval_bb_heldout = evaluate_by_breakdown(preds_bb_heldout, y_heldout, heldout_breakdowns, clusters=heldout_speakers)
 
+    eval_fusion_val = evaluate_by_breakdown(preds_fusion_val, y_val, val_breakdowns, clusters=val_speakers) if val_records else {}
     eval_fusion_test = evaluate_by_breakdown(preds_fusion_test, y_test, test_breakdowns, clusters=test_speakers)
     eval_fusion_heldout = evaluate_by_breakdown(preds_fusion_heldout, y_heldout, heldout_breakdowns, clusters=heldout_speakers)
+
+    verdict_val = (
+        generate_verdict(
+            eval_fusion_val["overall"]["eer"],
+            eval_ba_val["overall"]["eer"],
+            eval_bb_val["overall"]["eer"],
+            eval_fusion_val["overall"]["eer_ci"],
+        )
+        if val_records
+        else ""
+    )
 
     verdict_test = generate_verdict(
         eval_fusion_test["overall"]["eer"],
@@ -187,23 +231,29 @@ def evaluate_models(
 
     report = {
         "dataset_summary": {
+            "train_samples": len(train_records),
+            "val_samples": len(val_records),
             "test_samples": len(test_records),
             "heldout_samples": len(heldout_records),
         },
         "verdicts": {
+            "val_verdict": verdict_val,
             "test_verdict": verdict_test,
             "heldout_verdict": verdict_heldout,
         },
         "models": {
             "baseline_a_generic": {
+                "val": eval_ba_val,
                 "test": eval_ba_test,
                 "heldout_generalization": eval_ba_heldout,
             },
             "baseline_b_indian_accent": {
+                "val": eval_bb_val,
                 "test": eval_bb_test,
                 "heldout_generalization": eval_bb_heldout,
             },
             "vaanishield_fusion": {
+                "val": eval_fusion_val,
                 "test": eval_fusion_test,
                 "heldout_generalization": eval_fusion_heldout,
             },
@@ -219,7 +269,25 @@ def evaluate_models(
     report_md = out_path / "evaluation_report.md"
     with open(report_md, "w", encoding="utf-8") as f:
         f.write("# VaaniShield Evaluation & Baseline Comparison Report\n\n")
-        f.write("## 1. Overall Performance Comparison (In-Domain Test Set)\n\n")
+        f.write(
+            f"**Dataset Partition**: Train = `{len(train_records)}` | Validation (`val`) = `{len(val_records)}` | "
+            f"In-Domain Test (`test`) = `{len(test_records)}` | Held-Out Synthesizer (`heldout`) = `{len(heldout_records)}`\n\n"
+        )
+        if val_records:
+            f.write("## 1. Validation Split Performance (Calibration & Hyperparameter Selection Set)\n\n")
+            f.write(f"> **Verdict**: {verdict_val}\n\n")
+            f.write("| Model | Validation EER | 95% Confidence Interval | Precision | Recall |\n")
+            f.write("| :--- | :--- | :--- | :--- | :--- |\n")
+            for m_key, m_name in [
+                ("baseline_a_generic", "Baseline A (Generic SSL)"),
+                ("baseline_b_indian_accent", "Baseline B (Indian Accent Mel+LFCC)"),
+                ("vaanishield_fusion", "**VaaniShield (Boundary + SNAP Fusion)**"),
+            ]:
+                ov_v = report["models"][m_key]["val"]["overall"]
+                f.write(f"| {m_name} | {ov_v['eer']:.4f} | [{ov_v['eer_ci'][0]:.4f}, {ov_v['eer_ci'][1]:.4f}] | {ov_v['precision']:.4f} | {ov_v['recall']:.4f} |\n")
+            f.write("\n")
+
+        f.write("## 2. Overall Performance Comparison (In-Domain Test Set)\n\n")
         f.write(f"> **Verdict**: {verdict_test}\n\n")
         f.write("| Model | EER (Equal Error Rate) | 95% Confidence Interval | Precision | Recall |\n")
         f.write("| :--- | :--- | :--- | :--- | :--- |\n")
@@ -231,7 +299,7 @@ def evaluate_models(
             ov = report["models"][m_key]["test"]["overall"]
             f.write(f"| {m_name} | {ov['eer']:.4f} | [{ov['eer_ci'][0]:.4f}, {ov['eer_ci'][1]:.4f}] | {ov['precision']:.4f} | {ov['recall']:.4f} |\n")
 
-        f.write("\n## 2. Generalization to Unseen Synthesizer (Held-Out Set)\n\n")
+        f.write("\n## 3. Generalization to Unseen Synthesizer (Held-Out Set)\n\n")
         f.write(f"> **Verdict**: {verdict_heldout}\n\n")
         f.write("| Model | Generalization EER | 95% Confidence Interval | Precision | Recall |\n")
         f.write("| :--- | :--- | :--- | :--- | :--- |\n")
@@ -243,7 +311,7 @@ def evaluate_models(
             ov_h = report["models"][m_key]["heldout_generalization"]["overall"]
             f.write(f"| {m_name} | {ov_h['eer']:.4f} | [{ov_h['eer_ci'][0]:.4f}, {ov_h['eer_ci'][1]:.4f}] | {ov_h['precision']:.4f} | {ov_h['recall']:.4f} |\n")
 
-        f.write("\n## 3. Performance Breakdown by Telecom Noise Condition (VaaniShield)\n\n")
+        f.write("\n## 4. Performance Breakdown by Telecom Noise Condition (VaaniShield Test Split)\n\n")
         f.write("| Noise Condition | EER | 95% Confidence Interval | Precision | Recall |\n")
         f.write("| :--- | :--- | :--- | :--- | :--- |\n")
         noise_breakdowns = eval_fusion_test["breakdowns"].get("noise_condition", {})

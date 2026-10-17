@@ -131,45 +131,37 @@ def run_verification(
             fail(3, f"Record {r.get('utterance_id')} is missing 'split'")
         splits.setdefault(sp, []).append(r)
 
-    for required_split in ("train", "test", "heldout"):
+    for required_split in ("train", "val", "test", "heldout"):
         if required_split not in splits:
             fail(3, f"Required split '{required_split}' missing from manifest.")
 
-    train_speakers = set(r["speaker_id"] for r in splits["train"])
-    test_speakers = set(r["speaker_id"] for r in splits["test"])
-    heldout_speakers = set(r["speaker_id"] for r in splits["heldout"])
+    split_names = list(splits.keys())
+    for i in range(len(split_names)):
+        for j in range(i + 1, len(split_names)):
+            s1, s2 = split_names[i], split_names[j]
+            spk1 = set(r["speaker_id"] for r in splits[s1])
+            spk2 = set(r["speaker_id"] for r in splits[s2])
+            if spk1 & spk2:
+                fail(3, f"Speaker leak between '{s1}' and '{s2}': {spk1 & spk2}")
 
-    if train_speakers & test_speakers:
-        fail(3, f"Speaker leak between train and test: {train_speakers & test_speakers}")
-    if train_speakers & heldout_speakers:
-        fail(3, f"Speaker leak between train and heldout: {train_speakers & heldout_speakers}")
-    if test_speakers & heldout_speakers:
-        fail(3, f"Speaker leak between test and heldout: {test_speakers & heldout_speakers}")
+            utt1 = set(r["source_utterance_id"] for r in splits[s1] if r.get("source_utterance_id"))
+            utt2 = set(r["source_utterance_id"] for r in splits[s2] if r.get("source_utterance_id"))
+            if utt1 & utt2:
+                fail(3, f"Source utterance leak between '{s1}' and '{s2}': {utt1 & utt2}")
 
-    train_src_utts = set(r["source_utterance_id"] for r in splits["train"] if r.get("source_utterance_id"))
-    test_src_utts = set(r["source_utterance_id"] for r in splits["test"] if r.get("source_utterance_id"))
-    heldout_src_utts = set(r["source_utterance_id"] for r in splits["heldout"] if r.get("source_utterance_id"))
-
-    if train_src_utts & test_src_utts:
-        fail(3, f"Source utterance leak train vs test: {train_src_utts & test_src_utts}")
-    if train_src_utts & heldout_src_utts:
-        fail(3, f"Source utterance leak train vs heldout: {train_src_utts & heldout_src_utts}")
-    if test_src_utts & heldout_src_utts:
-        fail(3, f"Source utterance leak test vs heldout: {test_src_utts & heldout_src_utts}")
-
-    pass_check(3, "Zero speaker or source_utterance_id overlap across splits (strict partitioning).")
+    pass_check(3, "Zero speaker or source_utterance_id overlap across all 4 splits (train, val, test, heldout).")
 
     # -------------------------------------------------------------
-    # Check 4: Dual-class representation in test and held-out sets
+    # Check 4: Dual-class representation in val, test, and held-out sets
     # -------------------------------------------------------------
-    for sp_name in ("test", "heldout"):
+    for sp_name in ("val", "test", "heldout"):
         sp_labels = set(r["label"] for r in splits[sp_name])
         has_bona = "bona_fide" in sp_labels or "bonafide" in sp_labels
         has_spoof = "spoof" in sp_labels
         if not (has_bona and has_spoof):
             fail(4, f"Evaluation split '{sp_name}' has single class or missing class: {sp_labels}")
 
-    pass_check(4, "Both 'test' and 'heldout' evaluation splits contain dual classes (bona_fide & spoof).")
+    pass_check(4, "All evaluation splits ('val', 'test', 'heldout') contain dual classes (bona_fide & spoof).")
 
     # -------------------------------------------------------------
     # Check 5: Bona-fide vs spoof loudness distributions overlap

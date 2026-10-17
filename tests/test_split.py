@@ -18,29 +18,24 @@ def test_split_speaker_and_utterance_isolation():
         splits.setdefault(sp, []).append(r)
 
     assert "train" in splits, "train split missing"
+    assert "val" in splits, "val split missing"
     assert "test" in splits, "test split missing"
     assert "heldout" in splits, "heldout split missing"
 
-    train_speakers = set(r["speaker_id"] for r in splits["train"])
-    test_speakers = set(r["speaker_id"] for r in splits["test"])
-    heldout_speakers = set(r["speaker_id"] for r in splits["heldout"])
+    split_names = ["train", "val", "test", "heldout"]
+    for i in range(len(split_names)):
+        for j in range(i + 1, len(split_names)):
+            s1, s2 = split_names[i], split_names[j]
+            spk1 = set(r["speaker_id"] for r in splits[s1])
+            spk2 = set(r["speaker_id"] for r in splits[s2])
+            assert not (spk1 & spk2), f"Speaker leak {s1} vs {s2}: {spk1 & spk2}"
 
-    # 1. No speaker overlap across splits
-    assert not (train_speakers & test_speakers), f"Speaker leak train vs test: {train_speakers & test_speakers}"
-    assert not (train_speakers & heldout_speakers), f"Speaker leak train vs heldout: {train_speakers & heldout_speakers}"
-    assert not (test_speakers & heldout_speakers), f"Speaker leak test vs heldout: {test_speakers & heldout_speakers}"
+            utt1 = set(r["source_utterance_id"] for r in splits[s1] if r.get("source_utterance_id"))
+            utt2 = set(r["source_utterance_id"] for r in splits[s2] if r.get("source_utterance_id"))
+            assert not (utt1 & utt2), f"Source utterance leak {s1} vs {s2}: {utt1 & utt2}"
 
-    # 2. No source_utterance_id overlap across splits
-    train_src_utts = set(r["source_utterance_id"] for r in splits["train"] if r.get("source_utterance_id"))
-    test_src_utts = set(r["source_utterance_id"] for r in splits["test"] if r.get("source_utterance_id"))
-    heldout_src_utts = set(r["source_utterance_id"] for r in splits["heldout"] if r.get("source_utterance_id"))
-
-    assert not (train_src_utts & test_src_utts), f"Source utterance leak train vs test: {train_src_utts & test_src_utts}"
-    assert not (train_src_utts & heldout_src_utts), f"Source utterance leak train vs heldout: {train_src_utts & heldout_src_utts}"
-    assert not (test_src_utts & heldout_src_utts), f"Source utterance leak test vs heldout: {test_src_utts & heldout_src_utts}"
-
-    # 3. Dual-class representation in test and held-out splits
-    for split_name in ("test", "heldout"):
+    # 3. Dual-class representation in val, test, and held-out splits
+    for split_name in ("val", "test", "heldout"):
         labels = set(r["label"] for r in splits[split_name])
         assert "bona_fide" in labels and "spoof" in labels, (
             f"Split '{split_name}' must contain both bona_fide and spoof, found {labels}"

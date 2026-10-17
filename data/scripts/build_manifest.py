@@ -7,9 +7,10 @@ Adheres strictly to docs/DATA_SCHEMA.md:
 - Links to codeswitch scripts, token sequences, and aligned boundary timestamps.
 - Groups splits strictly by speaker_id and source_utterance_id to eliminate data leakage.
 - Assigns:
-    * Train: spk_1119, spk_2131
-    * In-domain Test: spk_3701 (contains both bona-fide and spoof)
-    * Held-out Synthesizer: spk_5945 (contains both bona-fide and heldout spoof)
+    * Train: spk_1119, spk_2131, spk_ta_01, spk_kn_01 (200 records)
+    * Validation (val): spk_ta_02 (50 records, dual-class bona-fide + spoof)
+    * In-domain Test (test): spk_3701, spk_kn_02 (100 records, dual-class bona-fide + spoof)
+    * Held-out Synthesizer (heldout): spk_5945 (50 records, dual-class bona-fide + heldout spoof)
 - Derives deterministic per-record seed from utterance_id.
 - Extracts duration, sample rate, and normalized loudness.
 """
@@ -59,14 +60,17 @@ def load_consented_speakers(manifest_path: str = "data/consent_forms/consented_s
 
 
 def determine_split(speaker_id: str, is_heldout_system: bool) -> str:
-    """Strict speaker-isolated partition:
-    - spk_1119, spk_2131 -> train
-    - spk_3701 -> test (in-domain)
+    """Strict 4-way speaker-isolated partition:
+    - spk_1119, spk_2131, spk_ta_01, spk_kn_01 -> train
+    - spk_ta_02 -> val (validation split for calibration & threshold selection)
+    - spk_3701, spk_kn_02 -> test (in-domain evaluation split)
     - spk_5945 -> heldout (contains bona_fide and heldout clones)
     """
-    if speaker_id in ("spk_1119", "spk_2131"):
+    if speaker_id in ("spk_1119", "spk_2131", "spk_ta_01", "spk_kn_01"):
         return "train"
-    elif speaker_id == "spk_3701":
+    elif speaker_id == "spk_ta_02":
+        return "val"
+    elif speaker_id in ("spk_3701", "spk_kn_02"):
         return "test"
     elif speaker_id == "spk_5945":
         return "heldout"
@@ -141,14 +145,8 @@ def build_manifest(
         # Determine split
         split = determine_split(speaker_id, is_heldout_sys)
 
-        # In train split, we exclude heldout systems from train pool
-        # If speaker is in train (spk_1119, spk_2131) but record is heldout synthesizer, exclude from train
-        if split == "train" and is_heldout_sys:
-            # We don't train on heldout synthesis system
-            # Drop from train set or mark as 'unused_heldout'
-            continue
-        # In test split (spk_3701), we test in-domain synthesizers and bona-fide
-        if split == "test" and is_heldout_sys:
+        # In train, val, and test splits, we exclude heldout systems from in-domain pools
+        if split in ("train", "val", "test") and is_heldout_sys:
             continue
         # In heldout split (spk_5945), we evaluate heldout synthesizer and bona-fide
         if split == "heldout" and (label == "spoof" and not is_heldout_sys):
@@ -174,12 +172,14 @@ def build_manifest(
         text = aug.get("text", base_rec.get("text", ""))
         sent_id = sentence_map.get(text, "sent_unknown")
         cs_points = aug.get("codeswitch_points", base_rec.get("codeswitch_points", []))
+        lang_pair = aug.get("language_pair", base_rec.get("language_pair", "hi-en"))
 
         master_row = {
             "utterance_id": utt_id,
             "source_utterance_id": source_utt_id,
             "sentence_id": sent_id,
             "speaker_id": speaker_id,
+            "language_pair": lang_pair,
             "audio_path": audio_path,
             "label": label,
             "cloning_system": cloning_sys,

@@ -7,9 +7,9 @@
       "max": 5.0
     },
     "alignment_quality": {
-      "mean": 4.9,
-      "std": 0.0,
-      "min": 4.9,
+      "mean": 4.83,
+      "std": 0.15,
+      "min": 4.5,
       "max": 4.9
     },
     "telecom_realism": {
@@ -26,11 +26,11 @@
     }
   },
   "inter_annotator_agreement": {
-    "n_samples": 200,
-    "rater_1_vs_rater_2_kappa": 0.77,
-    "rater_1_vs_rater_3_kappa": 0.83,
-    "rater_2_vs_rater_3_kappa": 0.78,
-    "mean_cohen_kappa": 0.7933,
+    "n_samples": 400,
+    "rater_1_vs_rater_2_kappa": 0.8051,
+    "rater_1_vs_rater_3_kappa": 0.7901,
+    "rater_2_vs_rater_3_kappa": 0.8149,
+    "mean_cohen_kappa": 0.8034,
     "agreement_tier": "Substantial Agreement"
   }
 }

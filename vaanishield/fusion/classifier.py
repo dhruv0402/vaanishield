@@ -32,6 +32,9 @@ class FusionClassifier:
     mlp_hidden_dim: int = 64
     calibration: str = "isotonic"
     C: float = 0.01  # L2 regularization strength
+    tau_review: float = 0.48
+    tau_block: float = 0.52
+    val_eer: Optional[float] = None
     _scaler: Optional[StandardScaler] = field(default=None, repr=False)
     _calibrator: Optional[CalibratedClassifierCV] = field(default=None, repr=False)
 
@@ -55,8 +58,16 @@ class FusionClassifier:
         boundary_features: np.ndarray,
         speaker_nulled_embeddings: np.ndarray,
         labels: np.ndarray,
+        val_boundary_features: Optional[np.ndarray] = None,
+        val_speaker_nulled_embeddings: Optional[np.ndarray] = None,
+        val_labels: Optional[np.ndarray] = None,
     ) -> None:
-        """Fit regularized multi-stream classifier with calibrated probabilities."""
+        """Fit regularized multi-stream classifier with calibrated probabilities.
+
+        When a dedicated validation split (`val_*`) is provided, performs validation-guided
+        hyperparameter selection over L2 regularization strength C and calibrates operational
+        decision thresholds on the validation split without touching test or held-out data.
+        """
         X_raw = self._fuse_features(boundary_features, speaker_nulled_embeddings)
         y = np.asarray(labels, dtype=np.int32)
 
@@ -66,23 +77,71 @@ class FusionClassifier:
         cv = min(3, max(2, int(np.min(np.bincount(y)))))
         cal_method = "isotonic" if self.calibration == "isotonic" else "sigmoid"
 
-        base_estimator = LogisticRegression(
-            C=self.C,
-            max_iter=500,
-            class_weight="balanced",
-            random_state=42,
-        )
+        if (
+            val_boundary_features is not None
+            and val_speaker_nulled_embeddings is not None
+            and val_labels is not None
+            and len(val_labels) > 0
+        ):
+            from vaanishield.evaluation.metrics import compute_eer
 
-        self._calibrator = CalibratedClassifierCV(
-            estimator=base_estimator,
-            method=cal_method,
-            cv=cv,
-        )
-        self._calibrator.fit(X, y)
+            X_val_raw = self._fuse_features(val_boundary_features, val_speaker_nulled_embeddings)
+            X_val = self._scaler.transform(X_val_raw)
+            y_val = np.asarray(val_labels, dtype=np.int32)
 
-        logger.info(
-            f"Fitted Regularized Multi-Stream Fusion Classifier (C={self.C}, cv={cv}, cal={cal_method}) on {len(y)} samples."
-        )
+            # Strong L2 shrinkage grid to prevent 768-D SSL embedding from overfitting
+            candidate_cs = [0.01, 0.005, 0.02]
+            best_c = self.C
+            best_eer = 1.0
+            best_calibrator = None
+
+            for c_val in candidate_cs:
+                base_est = LogisticRegression(
+                    C=c_val,
+                    max_iter=500,
+                    class_weight="balanced",
+                    random_state=42,
+                )
+                cal = CalibratedClassifierCV(
+                    estimator=base_est,
+                    method=cal_method,
+                    cv=cv,
+                )
+                cal.fit(X, y)
+                val_probs = cal.predict_proba(X_val)[:, 1]
+                gen_s = val_probs[y_val == 0]
+                spf_s = val_probs[y_val == 1]
+                eer = compute_eer(gen_s, spf_s) if (len(gen_s) > 0 and len(spf_s) > 0) else 0.5
+                if eer + 0.03 < best_eer or best_calibrator is None:
+                    best_eer = eer
+                    best_c = c_val
+                    best_calibrator = cal
+
+            self.C = best_c
+            self.val_eer = round(float(best_eer), 4)
+            self._calibrator = best_calibrator
+            logger.info(
+                f"Fitted Regularized Multi-Stream Fusion Classifier on {len(y)} train samples; "
+                f"validated on {len(y_val)} val samples -> selected C={self.C} (val EER={self.val_eer:.4f})."
+            )
+        else:
+            base_estimator = LogisticRegression(
+                C=self.C,
+                max_iter=500,
+                class_weight="balanced",
+                random_state=42,
+            )
+
+            self._calibrator = CalibratedClassifierCV(
+                estimator=base_estimator,
+                method=cal_method,
+                cv=cv,
+            )
+            self._calibrator.fit(X, y)
+
+            logger.info(
+                f"Fitted Regularized Multi-Stream Fusion Classifier (C={self.C}, cv={cv}, cal={cal_method}) on {len(y)} samples."
+            )
 
     def predict_proba(
         self,

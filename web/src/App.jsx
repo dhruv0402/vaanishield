@@ -77,14 +77,14 @@ export default function App() {
     },
     {
       id: "sample_kannada_bonafide",
-      label: "Preset: Regional South (Kannada-English Kanglish Authentic)",
-      transcript: "Nanna laptop start agalla, please check the battery.",
+      label: "Preset: Regional South (Kannada-English Kanglish Authentic - OpenSLR 79)",
+      transcript: "Nimma bank account block agide, verify your account details immediately.",
       type: "bonafide"
     },
     {
       id: "sample_tamil_cloned",
-      label: "Preset: Regional South (Tamil-English Tanglish Cloned)",
-      transcript: "Enaku presentation send pannunga, meeting starts tomorrow morning.",
+      label: "Preset: Regional South (Tamil-English Tanglish Cloned - OpenSLR 65)",
+      transcript: "Unga bank account freeze aayiduchu, verify your details immediately.",
       type: "cloned"
     },
     {

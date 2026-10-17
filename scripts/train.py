@@ -33,9 +33,12 @@ def train(
     with open(dataset_manifest, "r", encoding="utf-8") as f:
         all_records = [json.loads(line) for line in f]
 
-    # Select records belonging to the "train" split
+    # Select records belonging to the "train" and "val" splits
     train_records = [r for r in all_records if r.get("split") == "train"]
-    logger.info(f"Loaded {len(train_records)} training records (strictly train split).")
+    val_records = [r for r in all_records if r.get("split") == "val"]
+    logger.info(
+        f"Loaded {len(train_records)} training records (train split) and {len(val_records)} validation records (val split)."
+    )
 
     audio_paths = [r["audio_path"] for r in train_records]
     labels = np.array([1 if r.get("label") == "spoof" else 0 for r in train_records], dtype=np.int32)
@@ -57,7 +60,7 @@ def train(
             pickle.dump({"model": model, "config": cfg, "model_type": model_type}, f)
 
     elif model_type == "fusion":
-        # 1. Fit SNAP Speaker Nulling Projector
+        # 1. Fit SNAP Speaker Nulling Projector strictly on train split
         projector = SpeakerNullingProjector(
             ssl_backbone=cfg.get("speaker_null", {}).get("ssl_backbone", "microsoft/wavlm-base-plus")
         )
@@ -78,25 +81,43 @@ def train(
                     pts.append(p)
             return pts
 
-        boundary_mat = []
-        for r in train_records:
-            pts = parse_cs_points(r)
-            b_feats = extract_boundary_features(r["audio_path"], pts)
-            agg = aggregate_boundary_features(
-                b_feats,
-                aggregation=cfg.get("boundary_features", {}).get("aggregation", "mean_and_max"),
-            )
-            boundary_mat.append(agg)
-        boundary_mat = np.array(boundary_mat, dtype=np.float32)
+        def build_boundary_mat(recs):
+            mat = []
+            for r in recs:
+                pts = parse_cs_points(r)
+                b_feats = extract_boundary_features(r["audio_path"], pts)
+                agg = aggregate_boundary_features(
+                    b_feats,
+                    aggregation=cfg.get("boundary_features", {}).get("aggregation", "mean_and_max"),
+                )
+                mat.append(agg)
+            return np.array(mat, dtype=np.float32)
 
-        # 3. Fit calibrated FusionClassifier
+        boundary_mat = build_boundary_mat(train_records)
+
+        val_bmat, val_sn, val_labels = None, None, None
+        if val_records:
+            val_audio_paths = [r["audio_path"] for r in val_records]
+            val_labels = np.array([1 if r.get("label") == "spoof" else 0 for r in val_records], dtype=np.int32)
+            val_raw_embs = np.array([projector.embed(p) for p in val_audio_paths], dtype=np.float32)
+            val_sn = projector.project(val_raw_embs)
+            val_bmat = build_boundary_mat(val_records)
+
+        # 3. Fit calibrated FusionClassifier using train split and tune/calibrate on val split
         fusion_cfg = cfg.get("fusion", {})
         model = FusionClassifier(
             classifier_type=fusion_cfg.get("classifier", "logistic_regression"),
             mlp_hidden_dim=fusion_cfg.get("mlp_hidden_dim", 64),
             calibration=fusion_cfg.get("calibration", "isotonic"),
         )
-        model.fit(boundary_mat, nulled_embs, labels)
+        model.fit(
+            boundary_mat,
+            nulled_embs,
+            labels,
+            val_boundary_features=val_bmat,
+            val_speaker_nulled_embeddings=val_sn,
+            val_labels=val_labels,
+        )
 
         with open(saved_checkpoint_path, "wb") as f:
             pickle.dump({
