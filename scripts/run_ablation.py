@@ -36,6 +36,7 @@ def run_ablation(
         all_records = [json.loads(line) for line in f]
 
     train_recs = [r for r in all_records if r.get("split") == "train"]
+    val_recs = [r for r in all_records if r.get("split") == "val"]
     test_recs = [r for r in all_records if r.get("split") == "test"]
     heldout_recs = [r for r in all_records if r.get("split") == "heldout"]
 
@@ -44,6 +45,7 @@ def run_ablation(
         test_records=test_recs,
         heldout_records=heldout_recs,
         config=cfg,
+        val_records=val_recs,
     )
 
     # If scores.csv exists, synchronize the fused model metric directly from evaluation_report.json
@@ -52,6 +54,8 @@ def run_ablation(
         with open(eval_report_json, "r", encoding="utf-8") as f:
             eval_data = json.load(f)
         if "models" in eval_data and "vaanishield_fusion" in eval_data["models"]:
+            if "val" in eval_data["models"]["vaanishield_fusion"]:
+                results["fused"]["val_eval"] = eval_data["models"]["vaanishield_fusion"]["val"]
             results["fused"]["test_eval"] = eval_data["models"]["vaanishield_fusion"]["test"]
             results["fused"]["heldout_generalization"] = eval_data["models"]["vaanishield_fusion"]["heldout_generalization"]
 
@@ -64,8 +68,21 @@ def run_ablation(
     report_md = out_path / "ablation_report.md"
     with open(report_md, "w", encoding="utf-8") as f:
         f.write("# VaaniShield Three-Way Ablation Study\n\n")
-        f.write("Ablation evaluating individual and combined stream contributions across in-domain test and held-out sets.\n\n")
-        f.write("## 1. Ablation Variant Performance (In-Domain Test Set)\n\n")
+        f.write("Ablation evaluating individual and combined stream contributions across validation, in-domain test, and held-out sets.\n\n")
+        if val_recs and results["fused"].get("val_eval"):
+            f.write("## 1. Ablation Variant Performance (Validation Split)\n\n")
+            f.write("| Stream / Variant | Validation EER | 95% Confidence Interval | Precision | Recall |\n")
+            f.write("| :--- | :--- | :--- | :--- | :--- |\n")
+            for v_key, v_name in [
+                ("boundary_only", "Boundary-Local Stream Only"),
+                ("speaker_null_only", "Speaker-Nulled Global Stream Only"),
+                ("fused", "**Full VaaniShield Fused Model**"),
+            ]:
+                ov_v = results[v_key]["val_eval"]["overall"]
+                f.write(f"| {v_name} | {ov_v['eer']:.4f} | [{ov_v['eer_ci'][0]:.4f}, {ov_v['eer_ci'][1]:.4f}] | {ov_v['precision']:.4f} | {ov_v['recall']:.4f} |\n")
+            f.write("\n")
+
+        f.write("## 2. Ablation Variant Performance (In-Domain Test Set)\n\n")
         f.write("| Stream / Variant | EER | 95% Confidence Interval | Precision | Recall |\n")
         f.write("| :--- | :--- | :--- | :--- | :--- |\n")
         for v_key, v_name in [
@@ -76,7 +93,7 @@ def run_ablation(
             ov = results[v_key]["test_eval"]["overall"]
             f.write(f"| {v_name} | {ov['eer']:.4f} | [{ov['eer_ci'][0]:.4f}, {ov['eer_ci'][1]:.4f}] | {ov['precision']:.4f} | {ov['recall']:.4f} |\n")
 
-        f.write("\n## 2. Generalization to Held-Out Synthesizer\n\n")
+        f.write("\n## 3. Generalization to Held-Out Synthesizer\n\n")
         f.write("| Stream / Variant | Held-Out Generalization EER | 95% Confidence Interval | Precision | Recall |\n")
         f.write("| :--- | :--- | :--- | :--- | :--- |\n")
         for v_key, v_name in [

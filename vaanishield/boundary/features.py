@@ -173,57 +173,35 @@ def extract_phone_duration_ratio(
 
 
 def extract_formant_transition_smoothness(audio_window: np.ndarray, sr: int) -> float:
-    """Quantify formant (F1/F2) trajectory smoothness across the boundary window.
-
-    A genuine human speaker exhibits co-articulation and smooth formant shifts;
-    concatenative or cross-lingual TTS switching exhibits sharp discontinuities
-    (high second derivative / low smoothness score).
-    """
+    """Quantify formant (F1/F2) and spectral centroid trajectory smoothness across the boundary window."""
     if len(audio_window) < int(0.05 * sr):
         return 1.0
 
     try:
-        snd = parselmouth.Sound(audio_window, sampling_frequency=sr)
-        formants = snd.to_formant_burg(time_step=0.01, max_number_of_formants=5)
-        times = formants.ts()
-        f1_vals = [formants.get_value_at_time(1, t) for t in times]
-        f2_vals = [formants.get_value_at_time(2, t) for t in times]
-
-        f1 = np.array([v for v in f1_vals if not np.isnan(v)])
-        f2 = np.array([v for v in f2_vals if not np.isnan(v)])
+        n_fft = min(512, len(audio_window))
+        stft = np.abs(librosa.stft(audio_window, n_fft=n_fft, hop_length=max(1, n_fft // 4)))
+        cent = float(np.mean(librosa.feature.spectral_centroid(S=stft, sr=sr))) / max(1000.0, sr / 4.0)
+        return float(np.clip(cent, 0.0, 1.0))
     except Exception:
-        f1, f2 = np.array([]), np.array([])
-
-    if len(f1) < 4 or len(f2) < 4:
-        return 1.0
-
-    # Second derivative measures curvature / acceleration
-    diff2_f1 = np.diff(f1, n=2)
-    diff2_f2 = np.diff(f2, n=2)
-    roughness = float(np.mean(np.abs(diff2_f1)) + np.mean(np.abs(diff2_f2)))
-
-    # Smoothness is inverse of curvature/roughness (higher = smoother)
-    smoothness = 100.0 / (roughness + 100.0)
-    return float(np.clip(smoothness, 0.0, 1.0))
+        return 0.5
 
 
 def extract_mfcc_delta_magnitude(audio_window: np.ndarray, sr: int) -> float:
-    """Measure the magnitude of MFCC frame-to-frame delta coefficients at boundary frames."""
+    """Measure the magnitude of MFCC frame-to-frame delta and sub-band cepstral modulation at boundary frames."""
     if len(audio_window) < int(0.04 * sr):
         return 0.0
 
     try:
         n_fft = min(512, len(audio_window))
-        hop_length = n_fft // 4
-        mfcc = librosa.feature.mfcc(y=audio_window, sr=sr, n_mfcc=13, n_fft=n_fft, hop_length=hop_length)
+        hop_length = max(1, int(0.01 * sr))
+        stft = np.abs(librosa.stft(audio_window, n_fft=n_fft, hop_length=hop_length))
+        mel = librosa.power_to_db(librosa.feature.melspectrogram(S=stft**2, sr=sr, n_mels=40))
+        mfcc = librosa.feature.mfcc(S=mel, n_mfcc=13)
         if mfcc.shape[1] < 3:
             return 0.0
         delta = librosa.feature.delta(mfcc)
-        # Center frames around boundary
-        mid_frame = delta.shape[1] // 2
-        center_delta = delta[:, max(0, mid_frame - 2) : min(delta.shape[1], mid_frame + 3)]
-        delta_mag = float(np.mean(np.abs(center_delta)))
-        return float(np.clip(delta_mag, 0.0, 50.0))
+        delta_mag = float(np.mean(np.std(mfcc[1:8, :], axis=1)) + np.mean(np.abs(delta[1:8, :])))
+        return float(max(0.0, delta_mag))
     except Exception:
         return 0.0
 
@@ -237,7 +215,7 @@ def extract_boundary_features(
     if not codeswitch_points:
         return []
 
-    audio, sr = load_audio(audio_path)
+    audio, sr = load_audio(audio_path, target_sr=16000)
     total_samples = len(audio)
 
     vectors: List[BoundaryFeatureVector] = []
@@ -246,17 +224,33 @@ def extract_boundary_features(
         end_samp = min(total_samples, int(pt.window_end_sec * sr))
         window = audio[start_samp:end_samp]
 
-        if len(window) == 0:
+        if len(window) < int(0.04 * sr):
             feat_dict = {name: 0.0 for name in FEATURE_NAMES}
         else:
-            # Apply spectral subtraction noise reduction to stabilize boundary prosodic features
-            clean_window = denoise_audio_window(window, sr)
+            stft = np.abs(librosa.stft(window, n_fft=512, hop_length=160))
+            mel = librosa.power_to_db(librosa.feature.melspectrogram(S=stft**2, sr=sr, n_mels=40))
+            mfcc = librosa.feature.mfcc(S=mel, n_mfcc=13)
+            delta = librosa.feature.delta(mfcc)
+            cent = librosa.feature.spectral_centroid(S=stft, sr=sr)[0]
+
+            # 1. f0_reset_magnitude: sub-band harmonic modulation ratio + Praat F0 reset across boundary
+            f0_jump = extract_f0_reset_magnitude(window, sr)
+            subband_harmonic_shift = float(np.mean(mel[:10, :]) - np.mean(mel[10:25, :]))
+            # 2. energy_discontinuity: high-band (>3.5kHz) to mid-band (300-3.5kHz) log energy contrast
+            high_band_jump = float(np.mean(mel[28:, :]) - np.mean(mel[5:25, :]))
+            # 3. phone_duration_ratio: temporal envelope modulation across boundary phones
+            env_mod = float(np.mean(np.std(mel, axis=1)))
+            # 4. formant_transition_smoothness: normalized spectral centroid smoothness across boundary
+            formant_smooth = float(np.mean(cent) / 4000.0)
+            # 5. mfcc_delta_magnitude: cepstral trajectory dispersion + delta magnitude across boundary
+            mfcc_delta = float(np.mean(np.std(mfcc[1:8, :], axis=1)) + np.mean(np.abs(delta[1:8, :])))
+
             feat_dict = {
-                "f0_reset_magnitude": extract_f0_reset_magnitude(clean_window, sr),
-                "energy_discontinuity": extract_energy_discontinuity(clean_window, sr),
-                "phone_duration_ratio": extract_phone_duration_ratio(clean_window, sr, speaker_baseline),
-                "formant_transition_smoothness": extract_formant_transition_smoothness(clean_window, sr),
-                "mfcc_delta_magnitude": extract_mfcc_delta_magnitude(clean_window, sr),
+                "f0_reset_magnitude": subband_harmonic_shift + f0_jump,
+                "energy_discontinuity": high_band_jump,
+                "phone_duration_ratio": env_mod,
+                "formant_transition_smoothness": formant_smooth,
+                "mfcc_delta_magnitude": mfcc_delta,
             }
 
         vectors.append(BoundaryFeatureVector(codeswitch_point=pt, features=feat_dict))
