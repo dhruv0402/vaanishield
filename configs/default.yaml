@@ -37,7 +37,7 @@ speaker_null:
 fusion:
   classifier: "logistic_regression"   # options: "logistic_regression", "small_mlp"
   mlp_hidden_dim: 64                  # only used if classifier == "small_mlp"
-  calibration: "isotonic"             # for producing a usable probability + CI
+  calibration: "sigmoid"              # smooth Platt scaling for continuous probabilities + CI
 
 dataset_construction:
   cloning_systems_train: ["xtts"]

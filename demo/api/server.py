@@ -146,56 +146,59 @@ def get_sessions():
         ]
     }
 
+SAMPLE_CATALOG = [
+    {
+        "id": "sample_bonafide",
+        "name": "Authentic Human Voice — Hindi-English (OpenSLR 103 spk_1119)",
+        "path": "data/raw/spk_1119_1119_020.wav",
+        "transcript": "Mera laptop start nahi ho raha, can you check the battery?",
+        "expected": "bonafide",
+    },
+    {
+        "id": "sample_cloned",
+        "name": "Cloned Voice — Hindi-English (Coqui XTTS v2 spk_1119)",
+        "path": "data/processed/train_clones/spk_1119_utt_000_xtts.wav",
+        "transcript": "Mera laptop start nahi ho raha, can you check the battery?",
+        "expected": "spoof",
+    },
+    {
+        "id": "sample_codec",
+        "name": "Cloned Voice — 8 kHz Telephony Codec (G.711 μ-law)",
+        "path": "data/processed/augmented/spk_1119_utt_000_xtts_codec.wav",
+        "transcript": "Mera laptop start nahi ho raha, can you check the battery?",
+        "expected": "spoof",
+    },
+    {
+        "id": "sample_kannada_bonafide",
+        "name": "[UNSEEN TEST SPLIT] Authentic Human — Kannada-English (spk_kn_02)",
+        "path": "data/raw/spk_kn_02_knm_00271_00003824418.wav",
+        "transcript": "Nimma bank account block agide, verify your account details immediately.",
+        "expected": "bonafide",
+    },
+    {
+        "id": "sample_tamil_cloned",
+        "name": "[UNSEEN VAL SPLIT] Cloned Voice — Tamil-English (spk_ta_02 XTTS)",
+        "path": "data/processed/train_clones/spk_ta_02_utt_025_xtts.wav",
+        "transcript": "Unga bank account freeze aayiduchu, verify your details immediately.",
+        "expected": "spoof",
+    },
+    {
+        "id": "sample_heldout_cloned",
+        "name": "[UNSEEN HELDOUT SPLIT] Cloned Voice — Held-Out Synthesizer (spk_5945)",
+        "path": "data/processed/train_clones/spk_5945_utt_015_xtts.wav",
+        "transcript": "Mera account freeze ho gaya hai, please verify the transaction now.",
+        "expected": "spoof",
+    },
+]
+SAMPLE_MAP = {item["id"]: item["path"] for item in SAMPLE_CATALOG}
+
 @app.get("/api/samples")
 def get_samples():
-    return [
-        {
-            "id": "sample_bonafide",
-            "name": "Authentic Human Voice (OpenSLR 103 spk_1119)",
-            "path": "data/raw/spk_1119_1119_020.wav",
-            "transcript": "Mera laptop start nahi ho raha, can you check the battery?",
-            "expected": "bonafide"
-        },
-        {
-            "id": "sample_cloned",
-            "name": "Cloned Voice (Coqui XTTS v2)",
-            "path": "data/processed/train_clones/spk_1119_utt_000_xtts.wav",
-            "transcript": "Mera laptop start nahi ho raha, can you check the battery?",
-            "expected": "spoof"
-        },
-        {
-            "id": "sample_codec",
-            "name": "Cloned Voice with Telephony Codec Compression",
-            "path": "data/processed/augmented/spk_1119_utt_000_xtts_codec.wav",
-            "transcript": "Mera laptop start nahi ho raha, can you check the battery?",
-            "expected": "spoof"
-        },
-        {
-            "id": "sample_kannada_bonafide",
-            "name": "Authentic Human Voice (OpenSLR 79 Kannada spk_kn_02)",
-            "path": "data/raw/spk_kn_02_knm_00271_00003824418.wav",
-            "transcript": "Nimma bank account block agide, verify your account details immediately.",
-            "expected": "bonafide"
-        },
-        {
-            "id": "sample_tamil_cloned",
-            "name": "Cloned Voice (OpenSLR 65 Tamil spk_ta_02 XTTS)",
-            "path": "data/processed/train_clones/spk_ta_02_utt_025_xtts.wav",
-            "transcript": "Unga bank account freeze aayiduchu, verify your details immediately.",
-            "expected": "spoof"
-        }
-    ]
+    return SAMPLE_CATALOG
 
 @app.get("/api/audio/{sample_id}")
 def get_sample_audio(sample_id: str):
-    sample_map = {
-        "sample_bonafide": "data/raw/spk_1119_1119_020.wav",
-        "sample_cloned": "data/processed/train_clones/spk_1119_utt_000_xtts.wav",
-        "sample_codec": "data/processed/augmented/spk_1119_utt_000_xtts_codec.wav",
-        "sample_kannada_bonafide": "data/raw/spk_kn_02_knm_00271_00003824418.wav",
-        "sample_tamil_cloned": "data/processed/train_clones/spk_ta_02_utt_025_xtts.wav",
-    }
-    audio_path = sample_map.get(sample_id)
+    audio_path = SAMPLE_MAP.get(sample_id)
     if not audio_path or not os.path.exists(audio_path):
         raise HTTPException(status_code=404, detail=f"Audio sample not found: {sample_id}")
     return FileResponse(audio_path, media_type="audio/wav")
@@ -226,14 +229,7 @@ async def analyze_audio(
             tmp_path = tmp.name
         audio_path = tmp_path
     elif sample_id:
-        sample_map = {
-            "sample_bonafide": "data/raw/spk_1119_1119_020.wav",
-            "sample_cloned": "data/processed/train_clones/spk_1119_utt_000_xtts.wav",
-            "sample_codec": "data/processed/augmented/spk_1119_utt_000_xtts_codec.wav",
-            "sample_kannada_bonafide": "data/raw/spk_kn_02_knm_00271_00003824418.wav",
-            "sample_tamil_cloned": "data/processed/train_clones/spk_ta_02_utt_025_xtts.wav",
-        }
-        audio_path = sample_map.get(sample_id)
+        audio_path = SAMPLE_MAP.get(sample_id)
         if not audio_path or not os.path.exists(audio_path):
             raise HTTPException(status_code=400, detail=f"Invalid or missing sample: {sample_id}")
     else:
@@ -290,7 +286,7 @@ async def analyze_audio(
         ci_low_val = float(ci_low[0])
         ci_high_val = float(ci_high[0])
 
-        fused_vec = np.concatenate([agg_boundary_vector, nulled_emb])
+        fused_vec = model.transform_features(agg_boundary_vector, nulled_emb)
         raw_explanations = explain_prediction(fused_vec, model._calibrator, points)
 
         explanations = [

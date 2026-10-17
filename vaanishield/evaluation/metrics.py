@@ -75,7 +75,8 @@ def bootstrap_confidence_interval(
                 sampled_clusters = rng.choice(unique_clusters, size=n_clusters, replace=True)
                 sample_indices = []
                 for c in sampled_clusters:
-                    sample_indices.extend(np.where(cl == c)[0])
+                    c_idx = np.where(cl == c)[0]
+                    sample_indices.extend(rng.choice(c_idx, size=len(c_idx), replace=True))
                 sample_indices = np.array(sample_indices, dtype=int)
 
                 b_sc = sc[sample_indices]

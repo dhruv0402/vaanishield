@@ -111,6 +111,9 @@ def run_ablation_suite(
         "noise_condition": [r.get("noise_condition", "clean") for r in heldout_records],
     }
 
+    from sklearn.model_selection import StratifiedKFold
+    cv_split = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
     # Variant 1: Boundary-only (StandardScaled + L2 regularized)
     scaler_b = StandardScaler().fit(train_boundary_mat)
     X_tr_b = scaler_b.transform(train_boundary_mat)
@@ -120,8 +123,8 @@ def run_ablation_suite(
 
     clf_boundary = CalibratedClassifierCV(
         estimator=LogisticRegression(C=0.5, max_iter=500, class_weight="balanced", random_state=42),
-        method="isotonic",
-        cv=3,
+        method="sigmoid",
+        cv=cv_split,
     )
     clf_boundary.fit(X_tr_b, y_train)
     preds_val_boundary = clf_boundary.predict_proba(X_val_b)[:, 1] if val_recs else np.array([])
@@ -136,9 +139,9 @@ def run_ablation_suite(
     X_ho_sn = scaler_sn.transform(heldout_nulled_embs)
 
     clf_sn = CalibratedClassifierCV(
-        estimator=LogisticRegression(C=0.01, max_iter=500, class_weight="balanced", random_state=42),
-        method="isotonic",
-        cv=3,
+        estimator=LogisticRegression(C=0.02, max_iter=500, class_weight="balanced", random_state=42),
+        method="sigmoid",
+        cv=cv_split,
     )
     clf_sn.fit(X_tr_sn, y_train)
     preds_val_sn = clf_sn.predict_proba(X_val_sn)[:, 1] if val_recs else np.array([])
@@ -154,9 +157,9 @@ def run_ablation_suite(
     X_ho_f = scaler_f.transform(np.concatenate([heldout_boundary_mat, heldout_nulled_embs], axis=1))
 
     clf_fused = CalibratedClassifierCV(
-        estimator=LogisticRegression(C=0.005, max_iter=500, class_weight="balanced", random_state=42),
-        method="isotonic",
-        cv=3,
+        estimator=LogisticRegression(C=0.02, max_iter=500, class_weight="balanced", random_state=42),
+        method="sigmoid",
+        cv=cv_split,
     )
     clf_fused.fit(X_tr_f, y_train)
     preds_val_fused = clf_fused.predict_proba(X_val_f)[:, 1] if val_recs else np.array([])

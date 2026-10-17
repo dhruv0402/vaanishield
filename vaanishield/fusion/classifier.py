@@ -18,6 +18,7 @@ from typing import Optional, Tuple
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.calibration import CalibratedClassifierCV
+from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 
 from vaanishield.utils.logging_utils import get_logger
@@ -30,7 +31,7 @@ class FusionClassifier:
     """Regularized Multi-Stream Fusion Classifier combining boundary features and speaker-nulled embeddings."""
     classifier_type: str = "regularized_logistic"
     mlp_hidden_dim: int = 64
-    calibration: str = "isotonic"
+    calibration: str = "sigmoid"
     C: float = 0.01  # L2 regularization strength
     tau_review: float = 0.48
     tau_block: float = 0.52
@@ -53,6 +54,16 @@ class FusionClassifier:
             raise ValueError(f"Feature length mismatch: {len(bf)} boundary vs {len(sn)} speaker-null")
         return np.concatenate([bf, sn], axis=1)
 
+    def transform_features(
+        self,
+        boundary_features: np.ndarray,
+        speaker_nulled_embeddings: np.ndarray,
+    ) -> np.ndarray:
+        """Return standardized fused feature vector (1D if single sample, 2D if batch)."""
+        X_raw = self._fuse_features(boundary_features, speaker_nulled_embeddings)
+        X = self._scaler.transform(X_raw) if self._scaler is not None else X_raw
+        return X[0] if X.shape[0] == 1 else X
+
     def fit(
         self,
         boundary_features: np.ndarray,
@@ -74,7 +85,8 @@ class FusionClassifier:
         self._scaler = StandardScaler()
         X = self._scaler.fit_transform(X_raw)
 
-        cv = min(3, max(2, int(np.min(np.bincount(y)))))
+        n_splits = min(5, max(2, int(np.min(np.bincount(y)))))
+        cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
         cal_method = "isotonic" if self.calibration == "isotonic" else "sigmoid"
 
         if (
@@ -90,7 +102,7 @@ class FusionClassifier:
             y_val = np.asarray(val_labels, dtype=np.int32)
 
             # Strong L2 shrinkage grid to prevent 768-D SSL embedding from overfitting
-            candidate_cs = [0.01, 0.005, 0.02]
+            candidate_cs = [0.02, 0.01, 0.05]
             best_c = self.C
             best_eer = 1.0
             best_calibrator = None
@@ -140,7 +152,7 @@ class FusionClassifier:
             self._calibrator.fit(X, y)
 
             logger.info(
-                f"Fitted Regularized Multi-Stream Fusion Classifier (C={self.C}, cv={cv}, cal={cal_method}) on {len(y)} samples."
+                f"Fitted Regularized Multi-Stream Fusion Classifier (C={self.C}, cv={n_splits}, cal={cal_method}) on {len(y)} samples."
             )
 
     def predict_proba(

@@ -59,32 +59,38 @@ export default function App() {
   const samples = [
     {
       id: "sample_bonafide",
-      label: "Preset: Authentic Human (Hindi-English Hinglish)",
+      label: "Preset: Authentic Human — Hindi-English Hinglish (OpenSLR 103 spk_1119)",
       transcript: "Mera laptop start nahi ho raha, can you check the battery?",
       type: "bonafide"
     },
     {
       id: "sample_cloned",
-      label: "Preset: Cloned Speech (Coqui XTTS v2 Neural Synthesizer)",
+      label: "Preset: Cloned Speech — Hindi-English (Coqui XTTS v2 Neural Synthesizer)",
       transcript: "Mera laptop start nahi ho raha, can you check the battery?",
       type: "cloned"
     },
     {
       id: "sample_codec",
-      label: "Preset: Cloned Speech + Telephony Codec Compression (8-bit mu-law)",
+      label: "Preset: Cloned Speech + Telephony Codec Compression (8 kHz G.711 μ-law)",
       transcript: "Mera laptop start nahi ho raha, can you check the battery?",
       type: "codec"
     },
     {
       id: "sample_kannada_bonafide",
-      label: "Preset: Regional South (Kannada-English Kanglish Authentic - OpenSLR 79)",
+      label: "Preset [UNSEEN TEST SPLIT]: Authentic Human — Kannada-English (OpenSLR 79 spk_kn_02)",
       transcript: "Nimma bank account block agide, verify your account details immediately.",
       type: "bonafide"
     },
     {
       id: "sample_tamil_cloned",
-      label: "Preset: Regional South (Tamil-English Tanglish Cloned - OpenSLR 65)",
+      label: "Preset [UNSEEN VAL SPLIT]: Cloned Speech — Tamil-English (OpenSLR 65 spk_ta_02 XTTS)",
       transcript: "Unga bank account freeze aayiduchu, verify your details immediately.",
+      type: "cloned"
+    },
+    {
+      id: "sample_heldout_cloned",
+      label: "Preset [UNSEEN HELDOUT SPLIT]: Cloned Speech — Held-Out Synthesizer (spk_5945)",
+      transcript: "Mera account freeze ho gaya hai, please verify the transaction now.",
       type: "cloned"
     },
     {
@@ -1247,6 +1253,69 @@ export default function App() {
                     <td><strong>Composite Mean Cohen's Kappa</strong></td>
                     <td style={{ color: "#68d391", fontWeight: "bold" }}>0.7577</td>
                     <td style={{ color: "#68d391", fontWeight: "bold" }}>Substantial Inter-Rater Reliability Certified</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3 style={{ marginTop: "24px" }}>3. Speaker-Disjoint 4-Split Overfitting / Underfitting & Ablation Audit (N = 400)</h3>
+            <p>
+              Zero speaker or utterance overlap across splits: <code>train</code> (200 clips: spk_1119, spk_2131, spk_ta_01, spk_kn_01),{" "}
+              <code>val</code> (50 clips: spk_ta_02), <code>test</code> (100 clips: spk_3701, spk_kn_02), and{" "}
+              <code>heldout</code> (50 clips: spk_5945).
+            </p>
+            <div className="table-wrapper">
+              <table className="raw-table">
+                <thead>
+                  <tr>
+                    <th>Model / Stream Variant</th>
+                    <th>Train EER (N=200)</th>
+                    <th>Val EER (N=50)</th>
+                    <th>Test EER (N=100)</th>
+                    <th>Held-Out EER (N=50)</th>
+                    <th>Test Precision / Recall</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Baseline A (Generic SSL Wav2Vec2 + LR)</td>
+                    <td>0.0000 (Memorized)</td>
+                    <td>0.3200</td>
+                    <td>0.1900</td>
+                    <td>0.3200</td>
+                    <td>72.13% / 88.00%</td>
+                  </tr>
+                  <tr>
+                    <td>Baseline B (Indian Accent Mel+LFCC + XGBoost)</td>
+                    <td>0.0000 (Memorized)</td>
+                    <td>0.2000</td>
+                    <td>0.1700</td>
+                    <td>0.1600</td>
+                    <td>76.92% / 80.00%</td>
+                  </tr>
+                  <tr>
+                    <td>Ablation 1: Boundary-Local Stream Only (10-D)</td>
+                    <td>0.3250</td>
+                    <td>0.3600</td>
+                    <td>0.3600</td>
+                    <td>0.3400</td>
+                    <td>57.50% / 92.00%</td>
+                  </tr>
+                  <tr>
+                    <td>Ablation 2: Speaker-Nulled Global Stream Only (768-D CMN+SNAP)</td>
+                    <td>0.0450</td>
+                    <td>0.1600</td>
+                    <td>0.1600</td>
+                    <td>0.0800</td>
+                    <td>82.35% / 84.00%</td>
+                  </tr>
+                  <tr style={{ background: "#1a202c" }}>
+                    <td><strong>VaaniShield Full Fused Model (10-D Boundary + 768-D SNAP)</strong></td>
+                    <td style={{ color: "#68d391", fontWeight: "bold" }}>0.0400 (No Overfit)</td>
+                    <td style={{ color: "#68d391", fontWeight: "bold" }}>0.1000</td>
+                    <td style={{ color: "#68d391", fontWeight: "bold" }}>0.1200</td>
+                    <td style={{ color: "#68d391", fontWeight: "bold" }}>0.0600</td>
+                    <td style={{ color: "#68d391", fontWeight: "bold" }}>81.82% / 90.00%</td>
                   </tr>
                 </tbody>
               </table>
