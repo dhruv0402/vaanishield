@@ -28,9 +28,17 @@ def load_audio(path: str, target_sr: int = 16000) -> Tuple[np.ndarray, int]:
         raise FileNotFoundError(f"Audio file not found: {path}")
 
     try:
-        data, sr = sf.read(path, dtype="float32")
-        if data.ndim > 1:
-            data = np.mean(data, axis=1)
+        try:
+            data, sr = sf.read(path, dtype="float32")
+            if data.ndim > 1:
+                data = np.mean(data, axis=1)
+        except Exception:
+            import warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                data, sr = librosa.load(path, sr=None, mono=True)
+                data = data.astype(np.float32)
+
         if target_sr is not None and sr != target_sr:
             import warnings
             with warnings.catch_warnings():

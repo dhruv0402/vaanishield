@@ -63,8 +63,8 @@ _ROMANIZED_HINDI_LEXICON = {
 
 # Comprehensive Romanized Kannada lexicon
 _ROMANIZED_KANNADA_LEXICON = {
-    "nanna", "nange", "naanu", "beku", "beda", "hege", "yaake", "elli", "illi",
-    "banni", "hogona", "maadi", "agalla", "ide", "illa", "tumba", "oota", "houda",
+    "nanna", "nimma", "nange", "naanu", "beku", "beda", "hege", "yaake", "elli", "illi",
+    "banni", "hogona", "maadi", "agalla", "agide", "aagide", "ide", "illa", "tumba", "oota", "houda",
     "nodi", "helu", "ivattu", "naale", "dayavittu", "kodi", "gottu", "gottilla",
     "namaskara", "yenu", "yaaru", "barthira", "barthini", "kelsa", "mane", "oora",
     "kollu", "madona", "kodu", "thago", "swalpa", "sari", "chennagide", "kodi",
@@ -74,7 +74,7 @@ _ROMANIZED_KANNADA_LEXICON = {
 
 # Comprehensive Romanized Tamil lexicon (Tanglish conversational & agglutinative roots)
 _ROMANIZED_TAMIL_LEXICON = {
-    "enaku", "enakku", "enna", "epdi", "eppadi", "enga", "enge", "inge", "ange",
+    "enaku", "enakku", "unga", "ungal", "enna", "epdi", "eppadi", "enga", "enge", "inge", "ange",
     "vaanga", "vanga", "ponga", "pannunga", "pannalam", "panniten", "pannuren",
     "venum", "vendam", "vendaam", "iruku", "irukku", "iruke", "irukka", "illa",
     "illai", "rombavum", "romba", "saapadu", "sapadu", "paaru", "paathiya",
@@ -88,7 +88,8 @@ _ROMANIZED_TAMIL_LEXICON = {
     "indha", "andha", "indha", "rendu", "onnu", "moonu", "naalu", "anju", "aaru",
     "solren", "varren", "poren", "mudiyala", "kooda", "mattam", "mattum", "irundha",
     "va", "po", "dosa", "idly", "idli", "sambhar", "sambar", "rasam", "vadai", "vada",
-    "kaapi", "thanni", "ooru", "thirumba", "seekiram", "nalla", "nallaare", "kandippa"
+    "kaapi", "thanni", "ooru", "thirumba", "seekiram", "nalla", "nallaare", "kandippa",
+    "aayiduchu", "ayiduchu"
 }
 
 # Comprehensive Romanized Telugu lexicon

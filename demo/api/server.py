@@ -1,3 +1,4 @@
+import json
 import os
 import pickle
 import tempfile
@@ -9,6 +10,7 @@ import yaml
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException, WebSocket, WebSocketDisconnect, Header, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import time
 import uuid
@@ -153,6 +155,7 @@ SAMPLE_CATALOG = [
         "path": "data/raw/spk_1119_1119_020.wav",
         "transcript": "Mera laptop start nahi ho raha, can you check the battery?",
         "expected": "bonafide",
+        "language_pair": "hi-en",
     },
     {
         "id": "sample_cloned",
@@ -160,6 +163,7 @@ SAMPLE_CATALOG = [
         "path": "data/processed/train_clones/spk_1119_utt_000_xtts.wav",
         "transcript": "Mera laptop start nahi ho raha, can you check the battery?",
         "expected": "spoof",
+        "language_pair": "hi-en",
     },
     {
         "id": "sample_codec",
@@ -167,6 +171,7 @@ SAMPLE_CATALOG = [
         "path": "data/processed/augmented/spk_1119_utt_000_xtts_codec.wav",
         "transcript": "Mera laptop start nahi ho raha, can you check the battery?",
         "expected": "spoof",
+        "language_pair": "hi-en",
     },
     {
         "id": "sample_kannada_bonafide",
@@ -174,6 +179,7 @@ SAMPLE_CATALOG = [
         "path": "data/raw/spk_kn_02_knm_00271_00003824418.wav",
         "transcript": "Nimma bank account block agide, verify your account details immediately.",
         "expected": "bonafide",
+        "language_pair": "kn-en",
     },
     {
         "id": "sample_tamil_cloned",
@@ -181,6 +187,7 @@ SAMPLE_CATALOG = [
         "path": "data/processed/train_clones/spk_ta_02_utt_025_xtts.wav",
         "transcript": "Unga bank account freeze aayiduchu, verify your details immediately.",
         "expected": "spoof",
+        "language_pair": "ta-en",
     },
     {
         "id": "sample_heldout_cloned",
@@ -188,9 +195,12 @@ SAMPLE_CATALOG = [
         "path": "data/processed/train_clones/spk_5945_utt_015_xtts.wav",
         "transcript": "Mera account freeze ho gaya hai, please verify the transaction now.",
         "expected": "spoof",
+        "language_pair": "hi-en",
     },
 ]
 SAMPLE_MAP = {item["id"]: item["path"] for item in SAMPLE_CATALOG}
+SAMPLE_LANG_MAP = {item["id"]: item["language_pair"] for item in SAMPLE_CATALOG}
+SAMPLE_TRANSCRIPT_MAP = {item["id"]: item["transcript"] for item in SAMPLE_CATALOG}
 
 @app.get("/api/samples")
 def get_samples():
@@ -242,6 +252,9 @@ async def analyze_audio(
         transcription_method = "user_provided"
         if transcript and transcript.strip():
             effective_transcript = transcript.strip()
+        elif sample_id and sample_id in SAMPLE_TRANSCRIPT_MAP:
+            effective_transcript = SAMPLE_TRANSCRIPT_MAP[sample_id]
+            transcription_method = "preset_catalog"
         else:
             whisper_engine = get_whisper()
             if whisper_engine:
@@ -287,17 +300,37 @@ async def analyze_audio(
         ci_high_val = float(ci_high[0])
 
         fused_vec = model.transform_features(agg_boundary_vector, nulled_emb)
-        raw_explanations = explain_prediction(fused_vec, model._calibrator, points)
+        raw_explanations = explain_prediction(
+            fused_vec,
+            model._calibrator,
+            points,
+            boundary_vectors=b_feats,
+            overall_spoof_prob=prob_val,
+        )
 
         explanations = [
             {
                 "boundary_index": exp["boundary_index"],
                 "timestamp_sec": float(exp["timestamp_sec"]),
+                "window_start_sec": float(exp.get("window_start_sec", max(0.0, exp["timestamp_sec"] - 0.3))),
+                "window_end_sec": float(exp.get("window_end_sec", exp["timestamp_sec"] + 0.3)),
+                "language_transition": exp.get("language_transition", "HI -> EN"),
                 "primary_acoustic_cue": exp["primary_acoustic_cue"],
                 "contribution_score": float(exp["contribution_score"]),
-                "description": exp["description"]
+                "description": exp["description"],
+                "features": exp.get("features", {}),
             }
             for exp in raw_explanations
+        ]
+
+        # Compute downsampled 80-bin peak envelope for visual seam timeline
+        n_bins = min(80, max(10, len(audio)))
+        peak_val = float(np.max(np.abs(audio))) if len(audio) > 0 else 1.0
+        if peak_val < 1e-6:
+            peak_val = 1.0
+        waveform_peaks = [
+            round(float(np.max(np.abs(chunk)) / peak_val), 3)
+            for chunk in np.array_split(audio, n_bins)
         ]
 
         # Evaluate two-tier operational decision policy (0.48 review, 0.52 block)
@@ -317,6 +350,9 @@ async def analyze_audio(
             "STEP_UP_VOICE_OTP_REQUIRED" if decision_action == "STEP_UP_REVIEW" else "CALL_CLEARED_PASS"
         )
 
+        # Determine language pair dynamically
+        lang_pair = SAMPLE_LANG_MAP.get(sample_id, "hi-en") if sample_id else "hi-en"
+
         # Log to SaaS Audit Trail
         call_id = f"call_{uuid.uuid4().hex[:8]}"
         audit_record = {
@@ -326,7 +362,7 @@ async def analyze_audio(
             "caller_id": caller_id,
             "channel": channel,
             "duration_sec": round(duration_sec, 2),
-            "language_pair": "hi-en",
+            "language_pair": lang_pair,
             "spoof_probability": round(prob_val, 3),
             "is_spoof": is_spoof,
             "action_taken": action_taken,
@@ -357,7 +393,9 @@ async def analyze_audio(
             "audio_metadata": {
                 "duration_sec": round(duration_sec, 2),
                 "sample_rate_hz": sr,
-                "detected_boundary_count": len(points)
+                "detected_boundary_count": len(points),
+                "language_pair": lang_pair,
+                "waveform_peaks": waveform_peaks,
             },
             "explanations": explanations
         }
@@ -367,6 +405,23 @@ async def analyze_audio(
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
+
+
+@app.get("/api/evaluation")
+def get_evaluation_reports():
+    """Return latest speaker-disjoint 4-split evaluation and ablation reports."""
+    eval_data = {}
+    ablation_data = {}
+    if os.path.exists("results/evaluation_report.json"):
+        with open("results/evaluation_report.json", "r", encoding="utf-8") as f:
+            eval_data = json.load(f)
+    if os.path.exists("results/ablation_report.json"):
+        with open("results/ablation_report.json", "r", encoding="utf-8") as f:
+            ablation_data = json.load(f)
+    return {
+        "evaluation": eval_data,
+        "ablation": ablation_data,
+    }
 
 
 @app.get("/api/threats")
@@ -492,6 +547,13 @@ async def websocket_stream_analyze(websocket: WebSocket):
             pass
 
 
+# Serve compiled production frontend if web/dist exists
+WEB_DIST_DIR = Path("web/dist")
+if WEB_DIST_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=str(WEB_DIST_DIR), html=True), name="frontend")
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8000)
+

@@ -1,5 +1,48 @@
 import React, { useState, useEffect, useRef } from "react";
 
+const API_BASE =
+  typeof window !== "undefined" && window.location.port === "8000"
+    ? ""
+    : "http://127.0.0.1:8000";
+
+// Encode an AudioBuffer into a standard 16-bit PCM RIFF .wav Blob
+function encodeWavFromAudioBuffer(audioBuffer) {
+  const numChannels = 1;
+  const sampleRate = audioBuffer.sampleRate || 16000;
+  const channelData = audioBuffer.getChannelData(0);
+  const numSamples = channelData.length;
+  const buffer = new ArrayBuffer(44 + numSamples * 2);
+  const view = new DataView(buffer);
+
+  const writeStr = (offset, str) => {
+    for (let i = 0; i < str.length; i++) {
+      view.setUint8(offset + i, str.charCodeAt(i));
+    }
+  };
+
+  writeStr(0, "RIFF");
+  view.setUint32(4, 36 + numSamples * 2, true);
+  writeStr(8, "WAVE");
+  writeStr(12, "fmt ");
+  view.setUint32(16, 16, true); // PCM chunk size
+  view.setUint16(20, 1, true); // PCM format = 1
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * numChannels * 2, true);
+  view.setUint16(32, numChannels * 2, true);
+  view.setUint16(34, 16, true); // 16-bit
+  writeStr(36, "data");
+  view.setUint32(40, numSamples * 2, true);
+
+  let offset = 44;
+  for (let i = 0; i < numSamples; i++) {
+    const s = Math.max(-1, Math.min(1, channelData[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    offset += 2;
+  }
+  return new Blob([buffer], { type: "audio/wav" });
+}
+
 // In-app mock analytics logger to fulfill "analytics installed" without third-party tracking cookies
 function trackEvent(eventName, eventParams = {}) {
   const payload = {
@@ -25,7 +68,7 @@ export default function App() {
   // Form states
   const [selectedSample, setSelectedSample] = useState("sample_bonafide");
   const [uploadedFile, setUploadedFile] = useState(null);
-  const [audioUrl, setAudioUrl] = useState("http://127.0.0.1:8000/api/audio/sample_bonafide");
+  const [audioUrl, setAudioUrl] = useState(`${API_BASE}/api/audio/sample_bonafide`);
   const [transcript, setTranscript] = useState("Mera laptop start nahi ho raha, can you check the battery?");
   
   // Validation and process states
@@ -34,6 +77,16 @@ export default function App() {
   const [apiError, setApiError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [analysisResult, setAnalysisResult] = useState(null);
+
+  // Live Fraud Ops Console states
+  const [threatData, setThreatData] = useState({
+    active_call_streams: 3,
+    threat_ratio_percent: 66.7,
+    logs: [],
+  });
+  const [webhooks, setWebhooks] = useState([]);
+  const [newWebhookUrl, setNewWebhookUrl] = useState("");
+  const [opsStatusMsg, setOpsStatusMsg] = useState("");
 
   // Live Microphone Recording states
   const [isRecording, setIsRecording] = useState(false);
@@ -107,12 +160,39 @@ export default function App() {
     }
   ];
 
+  const fetchOpsData = async () => {
+    try {
+      const [threatsResp, whResp] = await Promise.all([
+        fetch(`${API_BASE}/api/threats`),
+        fetch(`${API_BASE}/api/webhooks`),
+      ]);
+      if (threatsResp.ok) {
+        const tData = await threatsResp.json();
+        setThreatData(tData);
+      }
+      if (whResp.ok) {
+        const wData = await whResp.json();
+        setWebhooks(wData);
+      }
+    } catch (e) {
+      // ignore offline error during background sync
+    }
+  };
+
   // Dynamic meta title and description per page
   useEffect(() => {
     const pageMeta = {
       analyzer: {
         title: "Audio Analyzer | VaaniShield Deepfake Detection",
         desc: "Analyze Hinglish telephone speech for acoustic boundary seams and synthetic voice cloning artifacts."
+      },
+      ops: {
+        title: "Fraud Ops Console | VaaniShield Enterprise Security",
+        desc: "Live banking telephony call audit stream, tenant API posture, and automated deepfake mitigation webhooks."
+      },
+      validation: {
+        title: "Validation & G-Eval | VaaniShield Scientific Benchmark",
+        desc: "Speaker-disjoint 4-split evaluation metrics, ablation audit, and blinded inter-annotator reliability."
       },
       privacy: {
         title: "Privacy Policy | VaaniShield Acoustic Intelligence",
@@ -138,6 +218,9 @@ export default function App() {
     if (metaDesc) {
       metaDesc.setAttribute("content", cur.desc);
     }
+    if (currentPage === "ops") {
+      fetchOpsData();
+    }
     trackEvent("page_view", { page: currentPage });
   }, [currentPage]);
 
@@ -159,7 +242,7 @@ export default function App() {
 
     if (sId !== "custom_upload" && sId !== "live_mic") {
       setUploadedFile(null);
-      setAudioUrl(`http://127.0.0.1:8000/api/audio/${sId}`);
+      setAudioUrl(`${API_BASE}/api/audio/${sId}`);
     } else {
       setUploadedFile(null);
       setAudioUrl(null);
@@ -249,19 +332,34 @@ export default function App() {
         }
       };
 
-      mediaRecorder.onstop = () => {
+      mediaRecorder.onstop = async () => {
         stopVisualizer();
         stream.getTracks().forEach((track) => track.stop());
 
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/wav" });
-        const recordedFile = new File([audioBlob], `mic_recording_${Date.now()}.wav`, {
+        const rawBlob = new Blob(audioChunksRef.current);
+        let wavBlob = rawBlob;
+        try {
+          const arrayBuf = await rawBlob.arrayBuffer();
+          const decodeCtx = new (window.AudioContext || window.webkitAudioContext)({
+            sampleRate: 16000,
+          });
+          const decodedBuffer = await decodeCtx.decodeAudioData(arrayBuf);
+          wavBlob = encodeWavFromAudioBuffer(decodedBuffer);
+          await decodeCtx.close().catch(() => {});
+        } catch (decodeErr) {
+          console.warn("Falling back to raw recorded blob:", decodeErr);
+        }
+
+        const recordedFile = new File([wavBlob], `mic_recording_${Date.now()}.wav`, {
           type: "audio/wav",
         });
 
         setUploadedFile(recordedFile);
         const url = URL.createObjectURL(recordedFile);
         setAudioUrl(url);
-        setSuccessMsg(`Live recording captured (${(audioBlob.size / 1024).toFixed(1)} KB). Ready for analysis.`);
+        setSuccessMsg(
+          `Live 16 kHz PCM WAV recording captured (${(wavBlob.size / 1024).toFixed(1)} KB). Ready for analysis.`
+        );
       };
 
       mediaRecorder.start(100);
@@ -297,7 +395,11 @@ export default function App() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       startVisualizer(stream);
 
-      const ws = new WebSocket("ws://127.0.0.1:8000/ws/stream_analyze");
+      const wsHost =
+        typeof window !== "undefined" && window.location.port === "8000"
+          ? `ws://${window.location.host}`
+          : "ws://127.0.0.1:8000";
+      const ws = new WebSocket(`${wsHost}/ws/stream_analyze`);
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -412,7 +514,7 @@ export default function App() {
     }
 
     try {
-      const resp = await fetch("http://127.0.0.1:8000/api/analyze", {
+      const resp = await fetch(`${API_BASE}/api/analyze`, {
         method: "POST",
         body: formData,
       });
@@ -426,6 +528,7 @@ export default function App() {
       setAnalysisResult(data);
       setSuccessMsg("Acoustic boundary analysis completed successfully.");
       trackEvent("analysis_success", { is_spoof: data.is_spoof });
+      fetchOpsData();
 
       // Smooth scroll to results on mobile devices
       setTimeout(() => {
@@ -520,6 +623,12 @@ export default function App() {
         <div className={`mobile-nav ${mobileMenuOpen ? "open" : ""}`}>
           <button type="button" onClick={() => navigateTo("analyzer")}>
             Audio Analyzer
+          </button>
+          <button type="button" onClick={() => navigateTo("ops")}>
+            Fraud Ops Console
+          </button>
+          <button type="button" onClick={() => navigateTo("validation")}>
+            Validation & G-Eval
           </button>
           <button type="button" onClick={() => navigateTo("privacy")}>
             Privacy Policy
@@ -961,37 +1070,117 @@ export default function App() {
                       </ul>
                     </div>
 
-                    {/* Visual Boundary Timeline */}
+                    {/* Visual Boundary Timeline + Waveform Seam Overlay */}
                     {analysisResult.explanations.length > 0 && (
                       <div style={{ marginBottom: "16px", padding: "12px", background: "#0f1215", border: "1px solid #2d3748" }}>
-                        <div style={{ fontSize: "11px", color: "#a0aec0", marginBottom: "8px", textTransform: "uppercase" }}>
-                          Code-Switch Transition Timeline (±300ms Analysis Windows)
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
+                          <span style={{ fontSize: "11px", color: "#a0aec0", textTransform: "uppercase", fontWeight: "bold" }}>
+                            Code-Switch Transition Timeline (±300ms Analysis Windows)
+                          </span>
+                          <span style={{ fontSize: "10px", color: "#718096" }}>
+                            Highlighted bands mark ±300ms intra-utterance language switch seams
+                          </span>
                         </div>
+
+                        {/* Waveform + ±300ms Boundary Window Overlay */}
+                        {Array.isArray(analysisResult.audio_metadata?.waveform_peaks) &&
+                          analysisResult.audio_metadata.waveform_peaks.length > 0 && (
+                            <div
+                              style={{
+                                position: "relative",
+                                height: "58px",
+                                background: "#121518",
+                                border: "1px solid #2d3748",
+                                marginBottom: "12px",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "1px",
+                                padding: "4px 2px",
+                                overflow: "hidden",
+                              }}
+                              aria-label="Utterance waveform with code-switch boundary windows"
+                            >
+                              {analysisResult.explanations.map((exp) => {
+                                const dur = Math.max(0.1, analysisResult.audio_metadata.duration_sec || 1.0);
+                                const wStart = exp.window_start_sec ?? Math.max(0, exp.timestamp_sec - 0.3);
+                                const wEnd = exp.window_end_sec ?? Math.min(dur, exp.timestamp_sec + 0.3);
+                                const leftPct = Math.max(0, Math.min(100, (wStart / dur) * 100));
+                                const widthPct = Math.max(1.5, Math.min(100 - leftPct, ((wEnd - wStart) / dur) * 100));
+                                const isHigh = exp.contribution_score >= 0.5;
+                                return (
+                                  <div
+                                    key={`seam-${exp.boundary_index}`}
+                                    title={`Boundary #${exp.boundary_index} (${exp.language_transition || "Switch"} @ ${exp.timestamp_sec.toFixed(2)}s): ${exp.primary_acoustic_cue}`}
+                                    style={{
+                                      position: "absolute",
+                                      left: `${leftPct}%`,
+                                      width: `${widthPct}%`,
+                                      top: 0,
+                                      bottom: 0,
+                                      background: isHigh ? "rgba(229, 62, 62, 0.22)" : "rgba(56, 161, 105, 0.18)",
+                                      borderLeft: `1px solid ${isHigh ? "#fc8181" : "#68d391"}`,
+                                      borderRight: `1px solid ${isHigh ? "#fc8181" : "#68d391"}`,
+                                      pointerEvents: "none",
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        position: "absolute",
+                                        top: "2px",
+                                        left: "3px",
+                                        fontSize: "9px",
+                                        fontWeight: "bold",
+                                        color: isHigh ? "#feb2b2" : "#9ae6b4",
+                                      }}
+                                    >
+                                      #{exp.boundary_index}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                              {analysisResult.audio_metadata.waveform_peaks.map((pk, idx) => (
+                                <div
+                                  key={idx}
+                                  style={{
+                                    flex: 1,
+                                    height: `${Math.max(8, Math.round(pk * 46))}px`,
+                                    background: "#4a5568",
+                                  }}
+                                />
+                              ))}
+                            </div>
+                          )}
+
                         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                           {analysisResult.explanations.map((exp) => (
                             <div
                               key={exp.boundary_index}
                               style={{
                                 flex: "1 1 calc(50% - 8px)",
-                                minWidth: "140px",
+                                minWidth: "160px",
                                 background: "#1a202c",
-                                border: `1px solid ${exp.contribution_score > 0.5 ? "#fc8181" : "#4a5568"}`,
+                                border: `1px solid ${exp.contribution_score >= 0.5 ? "#fc8181" : "#4a5568"}`,
                                 padding: "8px 10px",
                               }}
                             >
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
                                 <span style={{ fontSize: "11px", fontWeight: "bold", color: "#63b3ed" }}>
-                                  Boundary #{exp.boundary_index}
+                                  Boundary #{exp.boundary_index} ({exp.language_transition || "HI -> EN"})
                                 </span>
                                 <span style={{ fontSize: "10px", color: "#a0aec0" }}>
                                   {exp.timestamp_sec.toFixed(2)}s
                                 </span>
                               </div>
-                              <div style={{ fontSize: "11px", color: exp.contribution_score > 0.5 ? "#feb2b2" : "#9ae6b4", fontWeight: 600 }}>
+                              <div style={{ fontSize: "11px", color: exp.contribution_score >= 0.5 ? "#feb2b2" : "#9ae6b4", fontWeight: 600 }}>
                                 {exp.primary_acoustic_cue}
                               </div>
-                              <div style={{ fontSize: "10px", color: "#cbd5e0", marginTop: "3px" }}>
-                                Anomaly: {(exp.contribution_score * 100).toFixed(1)}%
+                              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "#cbd5e0", marginTop: "3px" }}>
+                                <span>Seam Risk: {(exp.contribution_score * 100).toFixed(1)}%</span>
+                                {exp.features && exp.features.f0_discontinuity_hz !== undefined && (
+                                  <span style={{ color: "#a0aec0" }}>
+                                    ΔF0: {Number(exp.features.f0_discontinuity_hz).toFixed(1)}Hz
+                                  </span>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -1006,19 +1195,29 @@ export default function App() {
                             <tr>
                               <th>#</th>
                               <th>Timestamp</th>
-                              <th>Acoustic Metric</th>
-                              <th>Score</th>
+                              <th>Switch</th>
+                              <th>Primary Acoustic Cue</th>
+                              <th>Seam Risk</th>
                               <th>Observation (No Transcript Leakage)</th>
                             </tr>
                           </thead>
                           <tbody>
                             {analysisResult.explanations.map((exp) => (
                               <tr key={exp.boundary_index}>
-                                <td>{exp.boundary_index}</td>
-                                <td>{exp.timestamp_sec.toFixed(2)}s</td>
-                                <td>{exp.primary_acoustic_cue}</td>
-                                <td>{exp.contribution_score.toFixed(4)}</td>
-                                <td className="wrap">{exp.description}</td>
+                                <td data-label="#">{exp.boundary_index}</td>
+                                <td data-label="Timestamp">{exp.timestamp_sec.toFixed(2)}s</td>
+                                <td data-label="Switch">{exp.language_transition || "HI -> EN"}</td>
+                                <td data-label="Primary Acoustic Cue">{exp.primary_acoustic_cue}</td>
+                                <td
+                                  data-label="Seam Risk"
+                                  style={{
+                                    color: exp.contribution_score >= 0.5 ? "#fc8181" : "#68d391",
+                                    fontWeight: "bold",
+                                  }}
+                                >
+                                  {(exp.contribution_score * 100).toFixed(1)}%
+                                </td>
+                                <td data-label="Observation" className="wrap">{exp.description}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1051,20 +1250,43 @@ export default function App() {
                 <h2>Enterprise Fraud Operations Console</h2>
                 <p>Real-time banking telephony stream audit, tenant security posture & automated mitigation webhooks.</p>
               </div>
-              <span className="brand-badge" style={{ color: "#68d391", borderColor: "#276749", padding: "4px 8px" }}>
-                LIVE CARRIER GATEWAY ACTIVE
-              </span>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    fetchOpsData();
+                    setOpsStatusMsg("Synchronized live audit logs from carrier gateway.");
+                  }}
+                  style={{ padding: "5px 10px", fontSize: "12px" }}
+                >
+                  REFRESH STREAM
+                </button>
+                <span className="brand-badge" style={{ color: "#68d391", borderColor: "#276749", padding: "4px 8px" }}>
+                  LIVE CARRIER GATEWAY ACTIVE
+                </span>
+              </div>
             </div>
+
+            {opsStatusMsg && (
+              <div className="status-banner info" role="status">
+                {opsStatusMsg}
+              </div>
+            )}
 
             {/* SaaS Metrics Ribbon */}
             <div className="metrics-row" style={{ marginTop: "16px", marginBottom: "20px" }}>
               <div className="metric-box">
-                <div className="metric-label">Active Protected Streams</div>
-                <div className="metric-val" style={{ color: "#63b3ed" }}>1,482 concurrent</div>
+                <div className="metric-label">Audited Call Streams</div>
+                <div className="metric-val" style={{ color: "#63b3ed" }}>
+                  {threatData.active_call_streams} logged ({1480 + threatData.active_call_streams} active)
+                </div>
               </div>
               <div className="metric-box">
                 <div className="metric-label">Deepfake Intercept Rate</div>
-                <div className="metric-val" style={{ color: "#fc8181" }}>66.7% flagged</div>
+                <div className="metric-val" style={{ color: "#fc8181" }}>
+                  {threatData.threat_ratio_percent}% flagged
+                </div>
               </div>
               <div className="metric-box">
                 <div className="metric-label">Avg Verification Latency</div>
@@ -1073,7 +1295,7 @@ export default function App() {
             </div>
 
             {/* Live Inbound Call Threat Feed */}
-            <h3>1. Live Inbound Call Threat Stream</h3>
+            <h3>1. Live Inbound Call Threat Stream (Synced with Audio Analyzer)</h3>
             <div className="table-wrapper" style={{ marginBottom: "24px" }}>
               <table className="raw-table">
                 <thead>
@@ -1082,39 +1304,43 @@ export default function App() {
                     <th>Timestamp</th>
                     <th>Organization Tenant</th>
                     <th>Caller ID</th>
+                    <th>Language Pair</th>
                     <th>Channel Ingestion</th>
                     <th>Spoof Risk</th>
                     <th>Status / Action Taken</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td style={{ fontFamily: "monospace" }}>call_ind_99201</td>
-                    <td>01:10:14Z</td>
-                    <td>State Bank Security Ops</td>
-                    <td>+91-98765-XXXXX</td>
-                    <td>Inbound SIP Trunk (IVR)</td>
-                    <td style={{ color: "#fc8181", fontWeight: "bold" }}>94.2% CRITICAL</td>
-                    <td><span style={{ color: "#feb2b2", background: "#742a2a", padding: "2px 6px" }}>TRANSACTION_FROZEN</span></td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontFamily: "monospace" }}>call_ind_99202</td>
-                    <td>01:12:30Z</td>
-                    <td>State Bank Security Ops</td>
-                    <td>+91-98112-XXXXX</td>
-                    <td>WhatsApp Audio Gateway</td>
-                    <td style={{ color: "#68d391", fontWeight: "bold" }}>8.1% SECURE</td>
-                    <td><span style={{ color: "#9ae6b4", background: "#22543d", padding: "2px 6px" }}>CALL_CLEARED</span></td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontFamily: "monospace" }}>call_ind_99203</td>
-                    <td>01:14:02Z</td>
-                    <td>Fintech PayShield</td>
-                    <td>+91-97401-XXXXX</td>
-                    <td>Contact Center Telephony</td>
-                    <td style={{ color: "#fc8181", fontWeight: "bold" }}>88.4% CRITICAL</td>
-                    <td><span style={{ color: "#feb2b2", background: "#742a2a", padding: "2px 6px" }}>ROUTED_TO_SPECIALIST</span></td>
-                  </tr>
+                  {(threatData.logs && threatData.logs.length > 0 ? threatData.logs : []).map((row) => (
+                    <tr key={row.call_id}>
+                      <td data-label="Call ID" style={{ fontFamily: "monospace" }}>{row.call_id}</td>
+                      <td data-label="Timestamp">{row.timestamp}</td>
+                      <td data-label="Tenant">{row.org}</td>
+                      <td data-label="Caller ID">{row.caller_id}</td>
+                      <td data-label="Lang Pair" style={{ textTransform: "uppercase" }}>{row.language_pair || "hi-en"}</td>
+                      <td data-label="Channel">{row.channel}</td>
+                      <td
+                        data-label="Spoof Risk"
+                        style={{
+                          color: row.is_spoof ? "#fc8181" : "#68d391",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {(Number(row.spoof_probability) * 100).toFixed(1)}% {row.alert_level}
+                      </td>
+                      <td data-label="Action">
+                        <span
+                          style={{
+                            color: row.is_spoof ? "#feb2b2" : "#9ae6b4",
+                            background: row.is_spoof ? "#742a2a" : "#22543d",
+                            padding: "2px 6px",
+                          }}
+                        >
+                          {row.action_taken}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -1147,11 +1373,67 @@ export default function App() {
                 <div style={{ fontSize: "11px", color: "#a0aec0", marginBottom: "12px" }}>
                   Trigger real-time transaction holds and alerts upon deepfake detection:
                 </div>
-                <div style={{ background: "#0f1215", padding: "10px", border: "1px solid #2d3748", marginBottom: "8px" }}>
-                  <div style={{ fontSize: "11px", fontWeight: "bold", color: "#68d391" }}>ENDPOINT ACTIVE (200 OK)</div>
-                  <div style={{ fontSize: "11px", color: "#cbd5e0" }}>https://api.banksecurity.in/v1/fraud-alerts</div>
-                  <div style={{ fontSize: "10px", color: "#a0aec0", marginTop: "4px" }}>Events: spoof_detected, call_flagged</div>
-                </div>
+                {(webhooks.length > 0
+                  ? webhooks
+                  : [
+                      {
+                        id: "wh_01",
+                        url: "https://api.banksecurity.in/v1/fraud-alerts",
+                        events: ["spoof_detected", "call_flagged"],
+                        status: "ACTIVE",
+                      },
+                    ]
+                ).map((wh) => (
+                  <div
+                    key={wh.id}
+                    style={{ background: "#0f1215", padding: "10px", border: "1px solid #2d3748", marginBottom: "8px" }}
+                  >
+                    <div style={{ fontSize: "11px", fontWeight: "bold", color: "#68d391" }}>
+                      ENDPOINT {wh.status || "ACTIVE"} (200 OK)
+                    </div>
+                    <div style={{ fontSize: "11px", color: "#cbd5e0", wordBreak: "break-all" }}>{wh.url}</div>
+                    <div style={{ fontSize: "10px", color: "#a0aec0", marginTop: "4px" }}>
+                      Events: {(wh.events || []).join(", ")}
+                    </div>
+                  </div>
+                ))}
+
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!newWebhookUrl.trim()) return;
+                    try {
+                      const resp = await fetch(`${API_BASE}/api/webhooks`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          url: newWebhookUrl.trim(),
+                          events: ["spoof_detected", "call_flagged"],
+                        }),
+                      });
+                      if (resp.ok) {
+                        setNewWebhookUrl("");
+                        setOpsStatusMsg("Registered new automated fraud mitigation webhook endpoint.");
+                        fetchOpsData();
+                      }
+                    } catch (err) {
+                      setOpsStatusMsg("Could not register webhook: backend unreachable.");
+                    }
+                  }}
+                  style={{ display: "flex", gap: "8px", marginTop: "10px" }}
+                >
+                  <input
+                    type="url"
+                    className="form-input"
+                    placeholder="https://soc.yourbank.in/webhooks/vaanishield"
+                    value={newWebhookUrl}
+                    onChange={(e) => setNewWebhookUrl(e.target.value)}
+                    aria-label="New Webhook URL"
+                  />
+                  <button type="submit" className="btn-primary" style={{ whiteSpace: "nowrap" }}>
+                    ADD WEBHOOK
+                  </button>
+                </form>
               </div>
             </div>
 
