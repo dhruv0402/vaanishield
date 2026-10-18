@@ -60,6 +60,70 @@
   --blue-glow: rgba(59, 130, 246, 0.2);
 }
 
+/* Light Theme Variables */
+[data-theme='light'] {
+  --bg-base: #f8fafc;
+  --bg-surface: #f1f5f9;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f8fafc;
+  --bg-card-subtle: #f1f5f9;
+  --bg-input: #ffffff;
+
+  --border-subtle: #e2e8f0;
+  --border-medium: #cbd5e1;
+  --border-bright: #2563eb;
+  --border-focus: #3b82f6;
+
+  --text-white: #0f172a;
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+
+  --emerald-pure: #059669;
+  --emerald-glow: rgba(16, 185, 129, 0.12);
+  --emerald-border: rgba(5, 150, 105, 0.35);
+  --emerald-text: #065f46;
+
+  --crimson-pure: #dc2626;
+  --crimson-glow: rgba(220, 38, 38, 0.12);
+  --crimson-border: rgba(220, 38, 38, 0.35);
+  --crimson-text: #991b1b;
+
+  --amber-pure: #d97706;
+  --amber-glow: rgba(217, 119, 6, 0.12);
+  --amber-border: rgba(217, 119, 6, 0.35);
+  --amber-text: #92400e;
+
+  --cyan-pure: #0891b2;
+  --cyan-glow: rgba(8, 145, 178, 0.12);
+  --cyan-border: rgba(8, 145, 178, 0.35);
+
+  --blue-pure: #2563eb;
+  --blue-glow: rgba(37, 99, 235, 0.15);
+}
+
+.theme-toggle-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s ease;
+}
+
+.theme-toggle-btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-medium);
+  transform: translateY(-1px);
+}
+
 html, body {
   width: 100%;
   height: 100%;
@@ -592,6 +656,26 @@ html, body {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 4px;
+}
+
+.verdict-policy-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 6px;
+  letter-spacing: 0.04em;
+}
+
+.verdict-policy-badge.badge-spoof {
+  background: var(--crimson-glow);
+  color: var(--crimson-text);
+  border: 1px solid var(--crimson-border);
+}
+
+.verdict-policy-badge.badge-bonafide {
+  background: var(--emerald-glow);
+  color: var(--emerald-text);
+  border: 1px solid var(--emerald-border);
 }
 
 .verdict-title {

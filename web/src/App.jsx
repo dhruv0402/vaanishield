@@ -46,6 +46,23 @@ function encodeWavFromAudioBuffer(audioBuffer) {
 export default function App() {
   const [currentPage, setCurrentPage] = useState("analyzer");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== "undefined" && window.localStorage) {
+      return localStorage.getItem("vaanishield_theme") || "dark";
+    }
+    return "dark";
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    if (typeof window !== "undefined" && window.localStorage) {
+      localStorage.setItem("vaanishield_theme", theme);
+    }
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+  };
 
   // Form states
   const [selectedSample, setSelectedSample] = useState("sample_bonafide");
@@ -431,6 +448,16 @@ export default function App() {
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <button
             type="button"
+            className="theme-toggle-btn"
+            onClick={toggleTheme}
+            title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
+            aria-label="Toggle theme"
+          >
+            {theme === "dark" ? "☀️" : "🌙"}
+          </button>
+
+          <button
+            type="button"
             className="mobile-menu-btn"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
@@ -442,6 +469,9 @@ export default function App() {
           <button type="button" onClick={() => navigateTo("analyzer")}>🛡️ Voice Detector</button>
           <button type="button" onClick={() => navigateTo("pipeline")}>⚡ Pipeline Flow</button>
           <button type="button" onClick={() => navigateTo("specs")}>🔬 Research & Evaluation</button>
+          <button type="button" onClick={toggleTheme}>
+            {theme === "dark" ? "☀️ Switch to Light Mode" : "🌙 Switch to Dark Mode"}
+          </button>
         </div>
       </header>
 
@@ -723,16 +753,7 @@ export default function App() {
                           : "AUTHENTIC HUMAN VOICE"}
                       </div>
                       <span
-                        className="mono-text"
-                        style={{
-                          fontSize: "11px",
-                          fontWeight: 700,
-                          padding: "2px 8px",
-                          borderRadius: "4px",
-                          background: analysisResult.is_spoof ? "rgba(239, 68, 68, 0.3)" : "rgba(16, 185, 129, 0.3)",
-                          color: analysisResult.is_spoof ? "#fca5a5" : "#86efac",
-                          border: analysisResult.is_spoof ? "1px solid rgba(239, 68, 68, 0.5)" : "1px solid rgba(16, 185, 129, 0.5)",
-                        }}
+                        className={`mono-text verdict-policy-badge ${analysisResult.is_spoof ? "badge-spoof" : "badge-bonafide"}`}
                       >
                         {analysisResult.operational_decision?.recommended_action || "POLICY PASS"}
                       </span>
