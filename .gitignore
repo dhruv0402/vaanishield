@@ -11,8 +11,8 @@ data/processed/heldout/
 !data/processed/master_manifest.jsonl
 !data/processed/codeswitch_scripts.*
 
-# Signed consent forms (verified OpenSLR research license IDs)
-!data/consent_forms/signed/
+# Signed consent forms (local signed forms for private recordings, never committed)
+data/consent_forms/signed/
 
 # Python & environments
 __pycache__/

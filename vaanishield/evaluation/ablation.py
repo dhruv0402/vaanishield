@@ -49,8 +49,9 @@ def run_ablation_suite(
     projector = SpeakerNullingProjector(
         ssl_backbone=config.get("speaker_null", {}).get("ssl_backbone", "microsoft/wavlm-base-plus")
     )
+    train_speaker_ids = [r["speaker_id"] for r in train_records]
     train_raw_embs = np.array([projector.embed(r["audio_path"]) for r in train_records], dtype=np.float32)
-    projector.fit_speaker_subspace(train_raw_embs, n_components=4)
+    projector.fit_speaker_subspace(train_raw_embs, speaker_ids=train_speaker_ids, n_components=4)
 
     train_nulled_embs = projector.project(train_raw_embs)
     val_nulled_embs = (
@@ -122,7 +123,7 @@ def run_ablation_suite(
     X_ho_b = scaler_b.transform(heldout_boundary_mat)
 
     clf_boundary = CalibratedClassifierCV(
-        estimator=LogisticRegression(C=0.5, max_iter=500, class_weight="balanced", random_state=42),
+        estimator=LogisticRegression(C=0.02, max_iter=500, class_weight="balanced", random_state=42),
         method="sigmoid",
         cv=cv_split,
     )

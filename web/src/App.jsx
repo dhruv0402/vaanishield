@@ -61,16 +61,6 @@ export default function App() {
   const [analysisResult, setAnalysisResult] = useState(null);
   const [showTechnicalLog, setShowTechnicalLog] = useState(false);
 
-  // Live Fraud Ops states
-  const [threatData, setThreatData] = useState({
-    active_call_streams: 3,
-    threat_ratio_percent: 66.7,
-    logs: [],
-  });
-  const [webhooks, setWebhooks] = useState([]);
-  const [newWebhookUrl, setNewWebhookUrl] = useState("");
-  const [opsStatusMsg, setOpsStatusMsg] = useState("");
-
   // Live Microphone states
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -82,12 +72,6 @@ export default function App() {
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
 
-  // Live Streaming WebSocket state
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [liveStreamRisk, setLiveStreamRisk] = useState(0.0);
-  const [liveStreamAlert, setLiveStreamAlert] = useState("SECURE");
-  const wsRef = useRef(null);
-
   const fileInputRef = useRef(null);
 
   // Preset sample list
@@ -96,7 +80,7 @@ export default function App() {
       id: "sample_bonafide",
       category: "human",
       title: "Real Voice (Hindi)",
-      speaker: "Bona-fide Human",
+      speaker: "Human (OpenSLR 103)",
       lang: "Hindi-English",
       transcript: "Mera laptop start nahi ho raha, can you check the battery?",
     },
@@ -104,7 +88,7 @@ export default function App() {
       id: "sample_kannada_bonafide",
       category: "human",
       title: "Real Voice (Kannada)",
-      speaker: "Bona-fide Human",
+      speaker: "Human (OpenSLR 79)",
       lang: "Kannada-English",
       transcript: "Nimma bank account block agide, verify your account details immediately.",
     },
@@ -121,7 +105,7 @@ export default function App() {
       category: "clone",
       title: "AI Clone (Tamil)",
       speaker: "Neural Synthesizer",
-      lang: "Tamil-English XTTS",
+      lang: "Tamil-English",
       transcript: "Unga bank account freeze aayiduchu, verify your details immediately.",
     },
     {
@@ -136,36 +120,11 @@ export default function App() {
       id: "sample_heldout_cloned",
       category: "clone",
       title: "AI Clone (Held-Out)",
-      speaker: "Unseen Model 5945",
+      speaker: "Unseen Speaker 5945",
       lang: "Hindi-English",
       transcript: "Mera account freeze ho gaya hai, please verify the transaction now.",
     },
   ];
-
-  const fetchOpsData = async () => {
-    try {
-      const [threatsResp, whResp] = await Promise.all([
-        fetch(`${API_BASE}/api/threats`),
-        fetch(`${API_BASE}/api/webhooks`),
-      ]);
-      if (threatsResp.ok) {
-        const tData = await threatsResp.json();
-        setThreatData(tData);
-      }
-      if (whResp.ok) {
-        const wData = await whResp.json();
-        setWebhooks(wData);
-      }
-    } catch (e) {
-      // ignore
-    }
-  };
-
-  useEffect(() => {
-    if (currentPage === "ops") {
-      fetchOpsData();
-    }
-  }, [currentPage]);
 
   // Handle preset select
   const selectPreset = (p) => {
@@ -223,192 +182,137 @@ export default function App() {
       };
 
       draw();
-    } catch (err) {
-      console.warn("Visualizer warning:", err);
+    } catch (e) {
+      console.warn("Visualizer init skipped:", e);
     }
   };
 
   const stopVisualizer = () => {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
     }
     if (audioContextRef.current) {
       audioContextRef.current.close().catch(() => {});
-      audioContextRef.current = null;
     }
   };
 
-  const handleStartRecording = async () => {
-    setFormError("");
-    setApiError("");
-    audioChunksRef.current = [];
-
+  // Start microphone
+  const startRecording = async () => {
     try {
+      setFormError("");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
-      startVisualizer(stream);
+      audioChunksRef.current = [];
 
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
       mediaRecorder.onstop = async () => {
+        const rawBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || "audio/webm" });
+        stream.getTracks().forEach((t) => t.stop());
         stopVisualizer();
-        stream.getTracks().forEach((track) => track.stop());
 
-        const rawBlob = new Blob(audioChunksRef.current);
-        let wavBlob = rawBlob;
         try {
-          const arrayBuf = await rawBlob.arrayBuffer();
           const decodeCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-          const decodedBuffer = await decodeCtx.decodeAudioData(arrayBuf);
-          wavBlob = encodeWavFromAudioBuffer(decodedBuffer);
-          await decodeCtx.close().catch(() => {});
-        } catch (e) {
-          // fallback
-        }
+          const arrayBuffer = await rawBlob.arrayBuffer();
+          const decoded = await decodeCtx.decodeAudioData(arrayBuffer);
+          const wavBlob = encodeWavFromAudioBuffer(decoded);
+          const wavFile = new File([wavBlob], `mic_${Date.now()}.wav`, { type: "audio/wav" });
 
-        const recordedFile = new File([wavBlob], `mic_voice_${Date.now()}.wav`, { type: "audio/wav" });
-        setUploadedFile(recordedFile);
-        setAudioUrl(URL.createObjectURL(recordedFile));
-        setSelectedSample("live_mic");
-        setSuccessMsg(`Captured voice recording (${(wavBlob.size / 1024).toFixed(1)} KB). Ready to scan.`);
+          setUploadedFile(wavFile);
+          setSelectedSample("");
+          setAudioUrl(URL.createObjectURL(wavBlob));
+          setSuccessMsg(`Recorded ${(decoded.duration).toFixed(1)}s audio.`);
+          decodeCtx.close().catch(() => {});
+        } catch (convErr) {
+          const fallbackFile = new File([rawBlob], "mic_input.wav", { type: rawBlob.type });
+          setUploadedFile(fallbackFile);
+          setSelectedSample("");
+          setAudioUrl(URL.createObjectURL(rawBlob));
+        }
       };
 
-      mediaRecorder.start(100);
+      mediaRecorder.start();
       setIsRecording(true);
       setRecordingDuration(0);
-      recordingTimerRef.current = setInterval(() => setRecordingDuration((p) => p + 1), 1000);
+      startVisualizer(stream);
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration((prev) => prev + 1);
+      }, 1000);
     } catch (err) {
-      setFormError("Microphone access denied. Please grant permission in your browser.");
+      setFormError(`Microphone access error: ${err.message}`);
     }
   };
 
-  const handleStopRecording = () => {
+  // Stop microphone
+  const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-        recordingTimerRef.current = null;
-      }
+      clearInterval(recordingTimerRef.current);
     }
   };
 
-  // Streaming WebSocket
-  const handleStartStreaming = async () => {
+  // Handle file upload
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith(".wav")) {
+      setFormError("Please upload an uncompressed .wav audio file.");
+      return;
+    }
+
+    setUploadedFile(file);
+    setSelectedSample("");
+    setAudioUrl(URL.createObjectURL(file));
     setFormError("");
     setApiError("");
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      startVisualizer(stream);
-
-      const wsHost = typeof window !== "undefined" && window.location.port === "8000"
-        ? `ws://${window.location.host}`
-        : "ws://127.0.0.1:8000";
-      const ws = new WebSocket(`${wsHost}/ws/stream_analyze`);
-      wsRef.current = ws;
-
-      ws.onopen = () => setIsStreaming(true);
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === "telemetry") {
-            setLiveStreamRisk(data.spoof_probability);
-            setLiveStreamAlert(data.alert_level);
-          }
-        } catch (e) {}
-      };
-      ws.onerror = () => handleStopStreaming();
-
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-      const source = audioCtx.createMediaStreamSource(stream);
-      const processor = audioCtx.createScriptProcessor(4096, 1, 1);
-      processor.onaudioprocess = (e) => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(e.inputBuffer.getChannelData(0).buffer);
-        }
-      };
-      source.connect(processor);
-      processor.connect(audioCtx.destination);
-
-      mediaRecorderRef.current = {
-        stop: () => {
-          processor.disconnect();
-          source.disconnect();
-          stream.getTracks().forEach((track) => track.stop());
-          audioCtx.close().catch(() => {});
-        }
-      };
-    } catch (err) {
-      setFormError("Microphone streaming failed: " + err.message);
-    }
+    setSuccessMsg(`Loaded ${file.name}`);
   };
 
-  const handleStopStreaming = () => {
-    if (mediaRecorderRef.current && isStreaming) mediaRecorderRef.current.stop();
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-    stopVisualizer();
-    setIsStreaming(false);
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (!file.name.toLowerCase().endsWith(".wav")) {
-        setFormError("Please upload an uncompressed .wav audio file.");
-        return;
-      }
-      setSelectedSample("custom_upload");
-      setUploadedFile(file);
-      setAudioUrl(URL.createObjectURL(file));
-      setSuccessMsg(`File selected: ${file.name}`);
-    }
-  };
-
-  // Run detection
-  const handleAnalyze = async (e) => {
-    if (e) e.preventDefault();
+  // Run detection analysis
+  const runAnalysis = async () => {
     setFormError("");
     setApiError("");
     setSuccessMsg("");
 
-    if ((selectedSample === "custom_upload" || selectedSample === "live_mic") && !uploadedFile) {
-      setFormError(selectedSample === "live_mic" ? "Please record audio first." : "Please select a .wav file first.");
+    if (!selectedSample && !uploadedFile) {
+      setFormError("Select an audio preset or record/upload audio.");
       return;
     }
 
     setIsLoading(true);
     const formData = new FormData();
-    if (transcript && transcript.trim()) formData.append("transcript", transcript.trim());
 
-    if ((selectedSample === "custom_upload" || selectedSample === "live_mic") && uploadedFile) {
+    if (uploadedFile) {
       formData.append("file", uploadedFile);
     } else {
       formData.append("sample_id", selectedSample);
     }
 
+    if (transcript.trim()) {
+      formData.append("transcript", transcript.trim());
+    }
+
     try {
-      const resp = await fetch(`${API_BASE}/api/analyze`, {
+      const res = await fetch(`${API_BASE}/api/analyze`, {
         method: "POST",
         body: formData,
       });
 
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({ detail: "Analysis request failed." }));
-        throw new Error(err.detail || `Server error: ${resp.status}`);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Server responded with ${res.status}`);
       }
 
-      const data = await resp.json();
+      const data = await res.json();
       setAnalysisResult(data);
-      fetchOpsData();
     } catch (err) {
-      setApiError(err.message || "Could not reach backend detection server.");
+      setApiError(err.message || "Failed to analyze audio.");
     } finally {
       setIsLoading(false);
     }
@@ -421,14 +325,20 @@ export default function App() {
 
   return (
     <div className="app-container">
-      {/* Header */}
+      {/* Top Header */}
       <header className="site-header">
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <a href="#detector" className="brand-link" onClick={() => navigateTo("analyzer")}>
-            <div className="brand-pulse" title="System Operational" />
-            <span>VAANISHIELD</span>
+        <div className="brand-group">
+          <a
+            href="#detector"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateTo("analyzer");
+            }}
+            className="brand-logo"
+          >
+            <span className="brand-icon">🛡️</span>
+            <span>VaaniShield</span>
           </a>
-          <span className="brand-badge" style={{ display: "none" }}>AI Voice Defense</span>
         </div>
 
         <nav className="nav-links">
@@ -441,23 +351,23 @@ export default function App() {
           </button>
           <button
             type="button"
-            className={currentPage === "ops" ? "active" : ""}
-            onClick={() => navigateTo("ops")}
+            className={currentPage === "pipeline" ? "active" : ""}
+            onClick={() => navigateTo("pipeline")}
           >
-            📊 Carrier Live Ops ({threatData.active_call_streams})
+            ⚡ Pipeline Flow
           </button>
           <button
             type="button"
             className={currentPage === "specs" ? "active" : ""}
             onClick={() => navigateTo("specs")}
           >
-            🔬 Research & Technical Specs
+            🔬 Research & Evaluation
           </button>
         </nav>
 
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <span className="brand-badge" style={{ color: "#10b981", borderColor: "rgba(16, 185, 129, 0.3)" }}>
-            CARRIER GATEWAY ACTIVE
+            ENGINE ACTIVE
           </span>
           <button
             type="button"
@@ -470,444 +380,452 @@ export default function App() {
 
         <div className={`mobile-nav ${mobileMenuOpen ? "open" : ""}`}>
           <button type="button" onClick={() => navigateTo("analyzer")}>🛡️ Voice Detector</button>
-          <button type="button" onClick={() => navigateTo("ops")}>📊 Carrier Live Ops</button>
-          <button type="button" onClick={() => navigateTo("specs")}>🔬 Research & Technical Specs</button>
+          <button type="button" onClick={() => navigateTo("pipeline")}>⚡ Pipeline Flow</button>
+          <button type="button" onClick={() => navigateTo("specs")}>🔬 Research & Evaluation</button>
         </div>
       </header>
 
       {/* Main View: Voice Detector */}
       {currentPage === "analyzer" && (
         <main className="main-dashboard">
-          {/* Left Column: Voice Input & Presets */}
-          <div className="dashboard-card">
-            <div className="dashboard-card-header">
-              <span className="card-title">1. Select Voice To Test</span>
-              <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>Indian Code-Switched Speech</span>
-            </div>
+          {/* Left Column: Audio Controls & Presets */}
+          <section className="dashboard-col left-col">
+            <div className="control-card">
+              <h3 style={{ fontSize: "14px", fontWeight: 700, marginBottom: "8px" }}>
+                1. Test Audio Sample
+              </h3>
 
-            <div className="dashboard-card-body">
-              {/* Presets Grid */}
-              <div className="preset-grid">
+              <div className="sample-grid">
                 {presets.map((p) => {
-                  const isSelected = selectedSample === p.id;
+                  const isSel = selectedSample === p.id && !uploadedFile;
                   return (
-                    <div
+                    <button
                       key={p.id}
-                      className={`preset-chip ${isSelected ? "active" : ""}`}
+                      type="button"
+                      className={`sample-btn ${isSel ? "active" : ""}`}
                       onClick={() => selectPreset(p)}
-                      role="button"
-                      tabIndex={0}
                     >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span className={`chip-type ${p.category}`}>
-                          {p.category === "human" ? "🟢 REAL HUMAN" : "🔴 AI CLONE"}
-                        </span>
-                        {isSelected && <span style={{ fontSize: "11px", color: "var(--color-blue)" }}>●</span>}
-                      </div>
-                      <div className="chip-name">{p.title}</div>
-                      <div className="chip-sub">{p.lang}</div>
-                    </div>
+                      <div className="sample-title">{p.title}</div>
+                      <div className="sample-sub">{p.speaker} &bull; {p.lang}</div>
+                    </button>
                   );
                 })}
               </div>
 
-              {/* Custom Input options */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "2px" }}>
+              {/* Upload & Mic Actions */}
+              <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+                <input
+                  type="file"
+                  accept=".wav"
+                  ref={fileInputRef}
+                  style={{ display: "none" }}
+                  onChange={handleFileUpload}
+                />
                 <button
                   type="button"
-                  className={`btn-secondary ${selectedSample === "live_mic" ? "active" : ""}`}
-                  style={{ textAlign: "center", padding: "8px", borderColor: selectedSample === "live_mic" ? "var(--color-blue)" : "" }}
-                  onClick={() => {
-                    setSelectedSample("live_mic");
-                    setUploadedFile(null);
-                    setAudioUrl(null);
-                    setAnalysisResult(null);
-                  }}
-                >
-                  🎙️ Use Microphone
-                </button>
-                <button
-                  type="button"
-                  className={`btn-secondary ${selectedSample === "custom_upload" ? "active" : ""}`}
-                  style={{ textAlign: "center", padding: "8px", borderColor: selectedSample === "custom_upload" ? "var(--color-blue)" : "" }}
-                  onClick={() => {
-                    setSelectedSample("custom_upload");
-                    fileInputRef.current?.click();
-                  }}
+                  className="btn-secondary"
+                  style={{ flex: 1, padding: "8px" }}
+                  onClick={() => fileInputRef.current.click()}
                 >
                   📁 Upload .WAV
                 </button>
+
+                {!isRecording ? (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ flex: 1, padding: "8px", borderColor: "#ef4444", color: "#ef4444" }}
+                    onClick={startRecording}
+                  >
+                    🎙️ Record Mic
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ flex: 1, padding: "8px", background: "rgba(239, 68, 68, 0.2)", color: "#fca5a5" }}
+                    onClick={stopRecording}
+                  >
+                    ⏹️ Stop ({recordingDuration}s)
+                  </button>
+                )}
+              </div>
+
+              {/* Live Canvas for mic */}
+              {isRecording && (
+                <div style={{ marginTop: "8px", borderRadius: "6px", overflow: "hidden", border: "1px solid #334155" }}>
+                  <canvas ref={canvasRef} width={380} height={40} style={{ display: "block", width: "100%" }} />
+                </div>
+              )}
+
+              {/* Audio Player */}
+              {audioUrl && (
+                <div style={{ marginTop: "12px", background: "#090c10", padding: "8px", borderRadius: "6px" }}>
+                  <audio
+                    src={audioUrl}
+                    controls
+                    style={{ width: "100%", height: "32px", display: "block" }}
+                  />
+                </div>
+              )}
+
+              {/* Transcript context (optional) */}
+              <div style={{ marginTop: "10px" }}>
+                <label style={{ fontSize: "11px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
+                  TRANSCRIPT CONTEXT (FOR CODE-SWITCH BOUNDARY ALIGNMENT)
+                </label>
                 <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".wav"
-                  style={{ display: "none" }}
-                  onChange={handleFileChange}
+                  type="text"
+                  value={transcript}
+                  onChange={(e) => setTranscript(e.target.value)}
+                  placeholder="e.g. Mera laptop start nahi ho raha..."
+                  style={{
+                    width: "100%",
+                    padding: "8px 10px",
+                    background: "#090c10",
+                    border: "1px solid var(--border-color)",
+                    color: "var(--text-primary)",
+                  }}
                 />
               </div>
 
-              {/* Mic Controls (if mic selected) */}
-              {selectedSample === "live_mic" && (
-                <div style={{ background: "var(--bg-card-subtle)", padding: "10px", borderRadius: "6px", border: "1px solid var(--border-color)" }}>
-                  <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
-                    {!isRecording ? (
-                      <button
-                        type="button"
-                        onClick={handleStartRecording}
-                        className="btn-scan"
-                        style={{ background: "#dc2626", borderColor: "#ef4444", flex: 1, padding: "8px" }}
-                      >
-                        RECORD VOICE
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleStopRecording}
-                        className="btn-scan"
-                        style={{ background: "#d97706", borderColor: "#f59e0b", flex: 1, padding: "8px" }}
-                      >
-                        STOP ({recordingDuration}s)
-                      </button>
-                    )}
-                    {!isStreaming ? (
-                      <button
-                        type="button"
-                        onClick={handleStartStreaming}
-                        className="btn-secondary"
-                        style={{ padding: "8px", fontSize: "11px" }}
-                      >
-                        LIVE INTERCEPT
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleStopStreaming}
-                        className="btn-secondary"
-                        style={{ padding: "8px", fontSize: "11px", color: "var(--color-red)" }}
-                      >
-                        STOP STREAM
-                      </button>
-                    )}
-                  </div>
-                  <canvas ref={canvasRef} width="380" height="42" style={{ width: "100%", height: "42px", display: "block" }} />
-                </div>
-              )}
+              {/* Error & Success Messages */}
+              {formError && <div className="banner error-banner">{formError}</div>}
+              {apiError && <div className="banner error-banner">{apiError}</div>}
+              {successMsg && <div className="banner success-banner">{successMsg}</div>}
 
-              {/* Audio Preview */}
-              {audioUrl && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                  <div style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: 600 }}>AUDIO PREVIEW</div>
-                  <audio controls src={audioUrl} style={{ width: "100%", height: "32px", display: "block" }} />
-                </div>
-              )}
-
-              {/* Notifications */}
-              {formError && <div className="status-banner error">{formError}</div>}
-              {apiError && <div className="status-banner error">{apiError}</div>}
-              {successMsg && <div className="status-banner success">{successMsg}</div>}
-
-              {/* Scan Button */}
+              {/* Execute Scan Button */}
               <button
                 type="button"
                 className="btn-scan"
-                onClick={handleAnalyze}
                 disabled={isLoading}
+                onClick={runAnalysis}
+                style={{ width: "100%", marginTop: "12px" }}
               >
-                {isLoading ? "⚡ SCANNING ACOUSTIC SEAMS..." : "🛡️ SCAN FOR VOICE CLONE"}
+                {isLoading ? "EXTRACTING DUAL-STREAM ACOUSTIC RESIDUALS..." : "🔍 VERIFY VOICE AUTHENTICITY"}
               </button>
+            </div>
+          </section>
 
-              {/* Compact 4-Step Visual Tracker */}
-              <div className="stepper-row">
-                <div className={`step-pill ${analysisResult ? "complete" : (isLoading ? "running" : "")}`}>
-                  <span className="step-pill-num">01. INGEST</span>
-                  <span className="step-pill-title">Audio Stream</span>
-                </div>
-                <div className={`step-pill ${analysisResult ? "complete" : (isLoading ? "running" : "")}`}>
-                  <span className="step-pill-num">02. SEAMS</span>
-                  <span className="step-pill-title">&plusmn;300ms Window</span>
-                </div>
-                <div className={`step-pill ${analysisResult ? "complete" : (isLoading ? "running" : "")}`}>
-                  <span className="step-pill-num">03. NULLING</span>
-                  <span className="step-pill-title">SNAP Subspace</span>
-                </div>
-                <div className={`step-pill ${analysisResult ? "complete" : (isLoading ? "running" : "")}`}>
-                  <span className="step-pill-num">04. VERDICT</span>
-                  <span className="step-pill-title">&lt;10ms Decision</span>
-                </div>
+          {/* Right Column: Detection Verdict & Forensic Explanations */}
+          <section className="dashboard-col right-col">
+            {!analysisResult && !isLoading && (
+              <div
+                className="control-card"
+                style={{
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  textAlign: "center",
+                  color: "var(--text-muted)",
+                }}
+              >
+                <div style={{ fontSize: "36px", marginBottom: "8px" }}>🛡️</div>
+                <h3 style={{ color: "var(--text-primary)", marginBottom: "4px" }}>
+                  Ready to Inspect Voice Clip
+                </h3>
+                <p style={{ maxWidth: "340px", fontSize: "12px", lineHeight: "1.5" }}>
+                  Select one of the 6 test audio samples on the left or record audio. Click <strong>Verify Voice Authenticity</strong> to inspect boundary phase discontinuities and speaker-nulled residuals.
+                </p>
               </div>
-            </div>
-          </div>
+            )}
 
-          {/* Right Column: Instant Visual Verdict & Telemetry */}
-          <div className="dashboard-card">
-            <div className="dashboard-card-header">
-              <span className="card-title">2. Authenticity Verdict & Telemetry</span>
-              {analysisResult && (
-                <span className="mono-text" style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-                  LATENCY: 0.009ms ONNX
-                </span>
-              )}
-            </div>
+            {isLoading && (
+              <div
+                className="control-card"
+                style={{
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  textAlign: "center",
+                }}
+              >
+                <div style={{ fontSize: "28px", animation: "spin 1.5s linear infinite" }}>⚙️</div>
+                <h3 style={{ marginTop: "12px", color: "var(--text-primary)" }}>
+                  Analyzing Acoustic Micro-Seams...
+                </h3>
+                <p style={{ color: "var(--text-muted)", fontSize: "12px", marginTop: "4px" }}>
+                  Checking pitch jumps (F0), formant trajectories, and SNAP orthogonal subspace.
+                </p>
+              </div>
+            )}
 
-            <div className="dashboard-card-body">
-              {!analysisResult && !isLoading && (
-                <div className="empty-box">
-                  <div className="empty-icon">🛡️</div>
-                  <div style={{ fontSize: "16px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "4px" }}>
-                    Ready For Voice Authentication
+            {analysisResult && (
+              <div className="control-card" style={{ height: "100%", overflowY: "auto" }}>
+                {/* Big Result Badge */}
+                <div
+                  className={`verdict-box ${
+                    analysisResult.is_spoof
+                      ? "spoof"
+                      : analysisResult.operational_decision?.risk_tier === "ELEVATED"
+                      ? "suspicious"
+                      : "bonafide"
+                  }`}
+                >
+                  <div className="verdict-icon">
+                    {analysisResult.is_spoof ? "🚨" : analysisResult.operational_decision?.risk_tier === "ELEVATED" ? "⚠️" : "✅"}
                   </div>
-                  <div style={{ fontSize: "13px", maxWidth: "340px", lineHeight: 1.4 }}>
-                    Choose a real human or AI cloned voice on the left and click <strong>"Scan For Voice Clone"</strong>.
-                  </div>
-                </div>
-              )}
-
-              {isLoading && (
-                <div className="empty-box">
-                  <div style={{ fontSize: "28px", marginBottom: "8px" }}>⚡</div>
-                  <div style={{ fontSize: "16px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "4px" }}>
-                    Analyzing Acoustic Discontinuities
-                  </div>
-                  <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                    Measuring F0 pitch resets, formant trajectories, and projecting onto speaker-null subspace...
-                  </div>
-                </div>
-              )}
-
-              {analysisResult && (
-                <>
-                  {/* Huge Visual Verdict Banner */}
-                  <div className={`verdict-banner ${analysisResult.is_spoof ? "fake" : "real"}`}>
-                    <div>
-                      <div className="verdict-headline">
-                        {analysisResult.is_spoof ? "🛑 AI CLONED VOICE DETECTED" : "🟢 AUTHENTIC HUMAN VOICE"}
-                      </div>
-                      <div className="verdict-sub">
-                        {analysisResult.is_spoof
-                          ? "Physical synthesis artifacts detected at intra-sentence language switch seams."
-                          : "Natural vocal-tract muscle continuity verified across language transitions."}
-                      </div>
+                  <div>
+                    <div className="verdict-title">
+                      {analysisResult.is_spoof
+                        ? "SYNTHETIC AI VOICE CLONE"
+                        : analysisResult.operational_decision?.risk_tier === "ELEVATED"
+                        ? "UNCERTAIN / STEP-UP VERIFICATION"
+                        : "AUTHENTIC HUMAN VOICE"}
                     </div>
-                    <div className="verdict-badge">
-                      {analysisResult.operational_decision?.decision === "BLOCK"
-                        ? "⛔ BLOCKED"
-                        : analysisResult.operational_decision?.decision === "STEP_UP_REVIEW"
-                        ? "⚠️ STEP-UP OTP"
-                        : "✅ PASS / SAFE"}
+                    <div className="verdict-desc">
+                      {analysisResult.is_spoof
+                        ? "Acoustic seam discontinuities and neural vocoder spectral artifacts detected."
+                        : analysisResult.operational_decision?.risk_tier === "ELEVATED"
+                        ? "Marginal acoustic confidence under channel noise; step-up biometric prompt suggested."
+                        : "Continuous natural vocal tract dynamics and zero neural synthesis seams."}
                     </div>
                   </div>
+                </div>
 
-                  {/* Visual Risk Gauge Meter */}
+                {/* Metrics Bar */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", margin: "12px 0" }}>
                   <div className="risk-meter-box">
-                    <div className="risk-meter-labels">
-                      <span>CALIBRATED FRAUD RISK</span>
-                      <span className="mono-text" style={{ color: analysisResult.is_spoof ? "#f87171" : "#4ade80", fontSize: "13px" }}>
-                        {(analysisResult.spoof_probability * 100).toFixed(1)}%
-                        <span style={{ color: "var(--text-muted)", fontSize: "11px", marginLeft: "4px" }}>
-                          [{(analysisResult.confidence_interval_95[0] * 100).toFixed(1)}% - {(analysisResult.confidence_interval_95[1] * 100).toFixed(1)}%]
-                        </span>
-                      </span>
+                    <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>SPOOF PROBABILITY</div>
+                    <div
+                      style={{
+                        fontSize: "20px",
+                        fontWeight: 800,
+                        color: analysisResult.is_spoof ? "#f87171" : "#4ade80",
+                      }}
+                    >
+                      {(analysisResult.spoof_probability * 100).toFixed(1)}%
                     </div>
+                  </div>
 
-                    <div className="risk-bar-track">
+                  <div className="risk-meter-box">
+                    <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>95% BOOTSTRAP CI</div>
+                    <div className="mono-text" style={{ fontSize: "12px", marginTop: "4px" }}>
+                      [{(analysisResult.confidence_interval_95[0] * 100).toFixed(1)}%, {(analysisResult.confidence_interval_95[1] * 100).toFixed(1)}%]
+                    </div>
+                  </div>
+
+                  <div className="risk-meter-box">
+                    <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>POLICY TIER</div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-primary)", marginTop: "4px" }}>
+                      {analysisResult.operational_decision?.decision || "PASS"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Waveform & Boundary Markers */}
+                <div style={{ margin: "12px 0" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--text-muted)", marginBottom: "4px" }}>
+                    <span>ACOUSTIC ENERGY & BOUNDARY WINDOW LOCATIONS</span>
+                    <span>{analysisResult.audio_metadata?.duration_sec}s duration</span>
+                  </div>
+                  <div
+                    style={{
+                      height: "44px",
+                      background: "#090c10",
+                      borderRadius: "6px",
+                      position: "relative",
+                      display: "flex",
+                      alignItems: "center",
+                      padding: "0 6px",
+                      gap: "2px",
+                      border: "1px solid var(--border-color)",
+                    }}
+                  >
+                    {(analysisResult.audio_metadata?.waveform_peaks || []).map((val, idx) => (
                       <div
-                        className="risk-bar-fill"
+                        key={idx}
                         style={{
-                          width: `${Math.min(100, Math.max(4, analysisResult.spoof_probability * 100))}%`,
+                          flex: 1,
+                          height: `${Math.max(4, Math.min(38, val * 38))}px`,
                           background: analysisResult.is_spoof ? "#ef4444" : "#10b981",
+                          opacity: 0.75,
+                          borderRadius: "1px",
                         }}
                       />
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "var(--text-muted)", marginTop: "4px" }}>
-                      <span>0% (Safe Human)</span>
-                      <span>Review Threshold (48%)</span>
-                      <span>100% (Confirmed Clone)</span>
-                    </div>
+                    ))}
+
+                    {/* Boundary Marker Lines */}
+                    {(analysisResult.explanations || []).map((exp, eIdx) => {
+                      const dur = analysisResult.audio_metadata?.duration_sec || 5.0;
+                      const pct = Math.min(98, Math.max(2, (exp.timestamp_sec / dur) * 100));
+                      return (
+                        <div
+                          key={eIdx}
+                          title={`Boundary #${exp.boundary_index}: ${exp.language_transition} at ${exp.timestamp_sec}s`}
+                          style={{
+                            position: "absolute",
+                            left: `${pct}%`,
+                            top: 0,
+                            bottom: 0,
+                            width: "2px",
+                            background: "#f59e0b",
+                            boxShadow: "0 0 6px #f59e0b",
+                            zIndex: 10,
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Acoustic Explanations List (Zero Transcript Content) */}
+                <div style={{ marginTop: "12px" }}>
+                  <div style={{ fontSize: "12px", fontWeight: 700, marginBottom: "6px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span>🔬 Acoustic Seam Attributions</span>
+                    <span style={{ fontSize: "10px", color: "var(--text-muted)", fontWeight: 400 }}>
+                      (Zero transcript content stored / DPDPA compliant)
+                    </span>
                   </div>
 
-                  {/* Waveform Seam Timeline */}
-                  {Array.isArray(analysisResult.audio_metadata?.waveform_peaks) && (
-                    <div className="waveform-box">
-                      <div className="waveform-header">
-                        <span>UTTERANCE TIMELINE &bull; {analysisResult.audio_metadata.duration_sec}s</span>
-                        <span style={{ color: analysisResult.is_spoof ? "#f87171" : "#4ade80" }}>
-                          {analysisResult.audio_metadata.detected_boundary_count} Language Switch Seams Highlighted
-                        </span>
-                      </div>
-
-                      <div className="waveform-canvas">
-                        {/* Seam overlays */}
-                        {analysisResult.explanations.map((exp) => {
-                          const dur = Math.max(0.1, analysisResult.audio_metadata.duration_sec || 1.0);
-                          const wStart = exp.window_start_sec ?? Math.max(0, exp.timestamp_sec - 0.3);
-                          const wEnd = exp.window_end_sec ?? Math.min(dur, exp.timestamp_sec + 0.3);
-                          const leftPct = Math.max(0, Math.min(100, (wStart / dur) * 100));
-                          const widthPct = Math.max(2, Math.min(100 - leftPct, ((wEnd - wStart) / dur) * 100));
-                          const isHigh = exp.contribution_score >= 0.5;
-                          return (
-                            <div
-                              key={exp.boundary_index}
-                              title={`Seam #${exp.boundary_index} (${exp.language_transition} @ ${exp.timestamp_sec}s): ${exp.primary_acoustic_cue}`}
+                  {(!analysisResult.explanations || analysisResult.explanations.length === 0) ? (
+                    <div style={{ fontSize: "12px", color: "var(--text-muted)", padding: "8px", background: "#090c10", borderRadius: "6px" }}>
+                      Monolingual or continuous vocal tract contour — no cross-lingual boundary seam detected.
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      {analysisResult.explanations.map((exp, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            background: "#090c10",
+                            border: "1px solid var(--border-color)",
+                            borderRadius: "6px",
+                            padding: "8px 10px",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)" }}>
+                              Boundary #{exp.boundary_index} &bull; {exp.language_transition} @ {exp.timestamp_sec}s
+                            </div>
+                            <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>
+                              {exp.description}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: "right" }}>
+                            <span
                               style={{
-                                position: "absolute",
-                                left: `${leftPct}%`,
-                                width: `${widthPct}%`,
-                                top: 0,
-                                bottom: 0,
-                                background: isHigh ? "rgba(239, 68, 68, 0.28)" : "rgba(16, 185, 129, 0.22)",
-                                borderLeft: `1px solid ${isHigh ? "#ef4444" : "#10b981"}`,
-                                borderRight: `1px solid ${isHigh ? "#ef4444" : "#10b981"}`,
-                                pointerEvents: "none",
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                                background: exp.contribution_score > 0.6 ? "rgba(239, 68, 68, 0.2)" : "rgba(16, 185, 129, 0.2)",
+                                color: exp.contribution_score > 0.6 ? "#fca5a5" : "#86efac",
                               }}
-                            />
-                          );
-                        })}
-
-                        {/* Waveform bars */}
-                        {analysisResult.audio_metadata.waveform_peaks.map((pk, idx) => (
-                          <div
-                            key={idx}
-                            style={{
-                              flex: 1,
-                              height: `${Math.max(6, Math.round(pk * 42))}px`,
-                              background: "#334155",
-                            }}
-                          />
-                        ))}
-                      </div>
+                            >
+                              {(exp.contribution_score * 100).toFixed(0)}% Seam Anomaly
+                            </span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
+                </div>
 
-                  {/* 3 Metric Pills */}
-                  <div className="feature-pills-row">
-                    <div className="feature-pill">
-                      <div className="feature-pill-label">Pitch Reset (ΔF0)</div>
-                      <div className="feature-pill-val" style={{ color: analysisResult.is_spoof ? "#f87171" : "#4ade80" }}>
-                        {analysisResult.is_spoof ? "Discontinuous" : "Natural Smooth"}
-                      </div>
-                    </div>
+                {/* Diagnostics Toggle */}
+                <div style={{ marginTop: "12px" }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ fontSize: "11px", padding: "4px 8px" }}
+                    onClick={() => setShowTechnicalLog(!showTechnicalLog)}
+                  >
+                    {showTechnicalLog ? "Hide Diagnostic Vector" : "Show Diagnostic Vector"}
+                  </button>
 
-                    <div className="feature-pill">
-                      <div className="feature-pill-label">Formant Inertia</div>
-                      <div className="feature-pill-val" style={{ color: analysisResult.is_spoof ? "#f87171" : "#4ade80" }}>
-                        {analysisResult.is_spoof ? "Synthetic Step" : "Organic Glide"}
-                      </div>
-                    </div>
-
-                    <div className="feature-pill">
-                      <div className="feature-pill-label">Speaker Accent Bias</div>
-                      <div className="feature-pill-val" style={{ color: "#38bdf8" }}>
-                        0.0% (SNAP Nulled)
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Toggle Forensic Log */}
-                  <div>
-                    <button
-                      type="button"
-                      className="btn-ghost"
-                      onClick={() => setShowTechnicalLog(!showTechnicalLog)}
+                  {showTechnicalLog && (
+                    <pre
+                      className="mono-text"
+                      style={{
+                        marginTop: "8px",
+                        padding: "8px",
+                        background: "#050709",
+                        borderRadius: "6px",
+                        fontSize: "11px",
+                        color: "#94a3b8",
+                        overflowX: "auto",
+                      }}
                     >
-                      {showTechnicalLog ? "▲ Hide Detailed Seam Breakdown" : "▼ Show Detailed Seam Breakdown"}
-                    </button>
-
-                    {showTechnicalLog && (
-                      <div className="table-wrapper" style={{ marginTop: "6px" }}>
-                        <table className="raw-table">
-                          <thead>
-                            <tr>
-                              <th>#</th>
-                              <th>Time</th>
-                              <th>Language Transition</th>
-                              <th>Primary Acoustic Cue</th>
-                              <th>Risk</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {analysisResult.explanations.map((exp) => (
-                              <tr key={exp.boundary_index}>
-                                <td className="mono-text">#{exp.boundary_index}</td>
-                                <td className="mono-text">{exp.timestamp_sec.toFixed(2)}s</td>
-                                <td>{exp.language_transition}</td>
-                                <td>{exp.primary_acoustic_cue}</td>
-                                <td className="mono-text" style={{ color: exp.contribution_score >= 0.5 ? "#f87171" : "#4ade80", fontWeight: 700 }}>
-                                  {(exp.contribution_score * 100).toFixed(1)}%
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
+                      {JSON.stringify(
+                        {
+                          decision_action: analysisResult.operational_decision?.decision,
+                          audio_metadata: analysisResult.audio_metadata,
+                          confidence_interval_95: analysisResult.confidence_interval_95,
+                          explanations: analysisResult.explanations,
+                        },
+                        null,
+                        2
+                      )}
+                    </pre>
+                  )}
+                </div>
+              </div>
+            )}
+          </section>
         </main>
       )}
 
-      {/* View 2: Live Fraud Ops Console */}
-      {currentPage === "ops" && (
+      {/* View 2: Pipeline Flow & Architecture */}
+      {currentPage === "pipeline" && (
         <article className="page-article">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
             <div>
-              <h2>Carrier Fraud Operations Stream</h2>
-              <p>Real-time telephony stream audit and automated transaction mitigation holds.</p>
+              <h2>VaaniShield End-to-End Pipeline Architecture</h2>
+              <p>How VaaniShield tracks synthetic speech and prevents voice fraud in Indian multilingual calls.</p>
             </div>
-            <div style={{ display: "flex", gap: "8px" }}>
-              <button type="button" className="btn-secondary" onClick={() => fetchOpsData()}>
-                REFRESH LOGS
-              </button>
-              <button type="button" className="btn-scan" onClick={() => navigateTo("analyzer")}>
-                BACK TO DETECTOR
-              </button>
+            <button type="button" className="btn-scan" onClick={() => navigateTo("analyzer")}>
+              TRY LIVE DETECTOR
+            </button>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "20px" }}>
+            <div className="control-card" style={{ padding: "14px" }}>
+              <div style={{ fontSize: "20px", marginBottom: "6px" }}>📡 Step 1</div>
+              <h4 style={{ fontSize: "13px", color: "var(--text-primary)", marginBottom: "4px" }}>Audio Ingestion</h4>
+              <p style={{ fontSize: "12px", color: "var(--text-muted)", lineHeight: "1.4" }}>
+                Ingests streaming 8 kHz PSTN / VoIP telephony or 16 kHz HD speech. Downsamples and strips loudness offsets.
+              </p>
+            </div>
+
+            <div className="control-card" style={{ padding: "14px" }}>
+              <div style={{ fontSize: "20px", marginBottom: "6px" }}>📍 Step 2</div>
+              <h4 style={{ fontSize: "13px", color: "var(--text-primary)", marginBottom: "4px" }}>Boundary Localization</h4>
+              <p style={{ fontSize: "12px", color: "var(--text-muted)", lineHeight: "1.4" }}>
+                Identifies code-switch points (e.g. Hindi &rarr; English). Extracts localized ±300ms analysis windows around transitions.
+              </p>
+            </div>
+
+            <div className="control-card" style={{ padding: "14px" }}>
+              <div style={{ fontSize: "20px", marginBottom: "6px" }}>🔬 Step 3</div>
+              <h4 style={{ fontSize: "13px", color: "var(--text-primary)", marginBottom: "4px" }}>Dual-Stream Extraction</h4>
+              <p style={{ fontSize: "12px", color: "var(--text-muted)", lineHeight: "1.4" }}>
+                <strong>Stream A:</strong> Boundary micro-seams (F0 reset, formant transitions).<br />
+                <strong>Stream B:</strong> SNAP speaker-nulling orthogonal projection.
+              </p>
+            </div>
+
+            <div className="control-card" style={{ padding: "14px" }}>
+              <div style={{ fontSize: "20px", marginBottom: "6px" }}>⚖️ Step 4</div>
+              <h4 style={{ fontSize: "13px", color: "var(--text-primary)", marginBottom: "4px" }}>Calibrated Fusion</h4>
+              <p style={{ fontSize: "12px", color: "var(--text-muted)", lineHeight: "1.4" }}>
+                Calibrated logistic regression produces continuous probabilities with 95% bootstrap CIs and operational risk tiers.
+              </p>
             </div>
           </div>
 
-          <div className="table-wrapper">
-            <table className="raw-table">
-              <thead>
-                <tr>
-                  <th>Call ID</th>
-                  <th>Timestamp</th>
-                  <th>Caller</th>
-                  <th>Language</th>
-                  <th>Channel</th>
-                  <th>Fraud Risk</th>
-                  <th>Action Taken</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(threatData.logs || []).map((row) => (
-                  <tr key={row.call_id}>
-                    <td className="mono-text">{row.call_id}</td>
-                    <td className="mono-text">{row.timestamp}</td>
-                    <td className="mono-text">{row.caller_id}</td>
-                    <td>{(row.language_pair || "hi-en").toUpperCase()}</td>
-                    <td>{row.channel}</td>
-                    <td className="mono-text" style={{ color: row.is_spoof ? "#f87171" : "#4ade80", fontWeight: 700 }}>
-                      {(Number(row.spoof_probability) * 100).toFixed(1)}%
-                    </td>
-                    <td>
-                      <span
-                        style={{
-                          background: row.is_spoof ? "rgba(239, 68, 68, 0.2)" : "rgba(16, 185, 129, 0.2)",
-                          color: row.is_spoof ? "#fca5a5" : "#86efac",
-                          padding: "2px 6px",
-                          borderRadius: "4px",
-                          fontSize: "11px",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {row.action_taken}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="control-card" style={{ padding: "16px", marginBottom: "16px" }}>
+            <h3 style={{ fontSize: "14px", marginBottom: "8px" }}>Why Both Streams are Necessary: The Indian Telephony Dilemma</h3>
+            <p style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: "1.6" }}>
+              1. <strong>Speaker Entanglement Problem:</strong> Standard deep learning models trained on voice samples easily memorize individual speakers or accent characteristics rather than synthesis artifacts. Our <em>Speaker-Nulling Artifact Projection (SNAP)</em> projects embeddings onto the orthogonal complement of the between-speaker subspace, stripping identity and preventing false alarms on non-standard Indian accents.<br />
+              2. <strong>Intra-Utterance Boundary Seams:</strong> Voice cloning models frequently fail when transitioning between languages mid-sentence (e.g., Hinglish), leaving subtle phase resets and unnatural pitch jumps at switch points. Our boundary stream detects these localized anomalies even under compression.
+            </p>
           </div>
         </article>
       )}
@@ -917,76 +835,113 @@ export default function App() {
         <article className="page-article">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
             <div>
-              <h2>Technical & Scientific Specifications</h2>
-              <p>Scientific benchmarks, ablation metrics, and telephony carrier integration standards.</p>
+              <h2>Scientific Evaluation & Ablation Results</h2>
+              <p>Empirical metrics computed across 4 strictly speaker-disjoint splits (N=400 recordings).</p>
             </div>
             <button type="button" className="btn-scan" onClick={() => navigateTo("analyzer")}>
-              BACK TO DETECTOR
+              TRY LIVE DETECTOR
             </button>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "20px" }}>
             <div className="risk-meter-box">
-              <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>G-EVAL COMPOSITE</div>
-              <div style={{ fontSize: "20px", fontWeight: 800, color: "#10b981" }}>4.92 / 5.0</div>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>IN-DOMAIN TEST EER</div>
+              <div style={{ fontSize: "20px", fontWeight: 800, color: "#10b981" }}>12.00%</div>
+              <div className="mono-text" style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>95% CI: [8.0%, 16.0%]</div>
             </div>
             <div className="risk-meter-box">
-              <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>COHEN'S KAPPA (κ)</div>
-              <div style={{ fontSize: "20px", fontWeight: 800, color: "#10b981" }}>0.7577</div>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>HELDOUT SPEAKER EER</div>
+              <div style={{ fontSize: "20px", fontWeight: 800, color: "#10b981" }}>6.00%</div>
+              <div className="mono-text" style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>95% CI: [2.0%, 10.0%]</div>
             </div>
             <div className="risk-meter-box">
-              <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>ONNX RUNTIME LATENCY</div>
-              <div style={{ fontSize: "20px", fontWeight: 800, color: "#38bdf8" }}>0.009 ms</div>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>VALIDATION EER</div>
+              <div style={{ fontSize: "20px", fontWeight: 800, color: "#38bdf8" }}>10.00%</div>
+              <div className="mono-text" style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>95% CI: [4.0%, 16.0%]</div>
             </div>
           </div>
 
-          <h3>1. Speaker-Disjoint 4-Split Performance Matrix (N=400)</h3>
-          <p>Zero speaker or sentence overlap across splits. Verified 0% underfitting / 0% memorization:</p>
+          <h3>1. Model Comparison across Splits (N=400)</h3>
+          <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "8px" }}>
+            Zero speaker or utterance overlap across splits. Verified generalization without speaker memorization:
+          </p>
           <div className="table-wrapper" style={{ marginBottom: "20px" }}>
             <table className="raw-table">
               <thead>
                 <tr>
                   <th>Model Configuration</th>
-                  <th>Train EER</th>
                   <th>Val EER</th>
-                  <th>Test EER</th>
-                  <th>Held-Out EER</th>
+                  <th>Test EER (In-Domain)</th>
+                  <th>Held-Out Speaker EER</th>
                   <th>Test Precision / Recall</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td>Baseline A (Wav2Vec2 + LR)</td>
-                  <td>0.0000</td>
-                  <td>0.3200</td>
-                  <td>0.1900</td>
-                  <td>0.3200</td>
+                  <td>Baseline A (Generic Acoustic + LR)</td>
+                  <td>32.0%</td>
+                  <td>19.0%</td>
+                  <td>32.0%</td>
                   <td>72.1% / 88.0%</td>
                 </tr>
                 <tr>
-                  <td>Baseline B (Mel+LFCC + XGBoost)</td>
-                  <td>0.0000</td>
-                  <td>0.2000</td>
-                  <td>0.1700</td>
-                  <td>0.1600</td>
+                  <td>Baseline B (Indian-Accent Mel + LFCC)</td>
+                  <td>20.0%</td>
+                  <td>17.0%</td>
+                  <td>16.0%</td>
                   <td>76.9% / 80.0%</td>
                 </tr>
                 <tr style={{ background: "rgba(16, 185, 129, 0.1)" }}>
                   <td><strong>VaaniShield Full Fused Model</strong></td>
-                  <td style={{ color: "#10b981", fontWeight: 700 }}>0.0400</td>
-                  <td style={{ color: "#10b981", fontWeight: 700 }}>0.1000</td>
-                  <td style={{ color: "#10b981", fontWeight: 700 }}>0.1200</td>
-                  <td style={{ color: "#10b981", fontWeight: 700 }}>0.0600</td>
+                  <td style={{ color: "#10b981", fontWeight: 700 }}>10.0%</td>
+                  <td style={{ color: "#10b981", fontWeight: 700 }}>12.0%</td>
+                  <td style={{ color: "#10b981", fontWeight: 700 }}>6.0%</td>
                   <td style={{ color: "#10b981", fontWeight: 700 }}>81.8% / 90.0%</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <h3>2. Zero Transcript Leakage (DPDPA 2023 Compliance)</h3>
-          <p>
-            In compliance with India's Digital Personal Data Protection Act 2023, VaaniShield uses strictly non-semantic acoustic analysis.
-            Conversational spoken words are never recorded, transcribed, or stored.
+          <h3>2. Three-Way Ablation Analysis (Scientific Integrity)</h3>
+          <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "8px" }}>
+            Evaluating individual and combined stream contributions across test and held-out sets:
+          </p>
+          <div className="table-wrapper" style={{ marginBottom: "20px" }}>
+            <table className="raw-table">
+              <thead>
+                <tr>
+                  <th>Stream Variant</th>
+                  <th>Test EER</th>
+                  <th>Held-Out Speaker EER</th>
+                  <th>Finding & Role in Architecture</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Boundary-Local Stream Only</td>
+                  <td>36.0%</td>
+                  <td>34.0%</td>
+                  <td>Boundary cues alone degrade under heavy telephony codecs (PSTN/G.711).</td>
+                </tr>
+                <tr>
+                  <td>Speaker-Nulled Global Stream Only</td>
+                  <td>16.0%</td>
+                  <td>8.0%</td>
+                  <td>Orthogonal projection removes speaker identity and carries the primary artifact signal.</td>
+                </tr>
+                <tr style={{ background: "rgba(16, 185, 129, 0.1)" }}>
+                  <td><strong>VaaniShield Fused Model</strong></td>
+                  <td style={{ color: "#10b981", fontWeight: 700 }}>12.0%</td>
+                  <td style={{ color: "#10b981", fontWeight: 700 }}>6.0%</td>
+                  <td>Fusing boundary transition dynamics with speaker-nulled residuals yields lowest overall EER.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>3. Zero Transcript Storage & DPDPA 2023 Compliance</h3>
+          <p style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: "1.6" }}>
+            In compliance with India's Digital Personal Data Protection Act (DPDPA 2023), VaaniShield performs strictly non-semantic acoustic analysis. Audio is evaluated strictly for physical vocal tract and vocoder anomalies; speech content is never recorded, transcribed, or stored in persistent databases.
           </p>
         </article>
       )}
@@ -994,10 +949,10 @@ export default function App() {
       {/* Footer */}
       <footer className="site-footer">
         <div>
-          &copy; 2026 VaaniShield Security. IIT Delhi Research Park.
+          &copy; 2026 VaaniShield Research &bull; IIT Delhi Research Park
         </div>
         <div>
-          Zero-Transcript Telephony Defense &bull; Sub-10ms Carrier SLA
+          Privacy-Preserving Acoustic Voice Clone Detection &bull; Zero Transcript Storage
         </div>
       </footer>
     </div>

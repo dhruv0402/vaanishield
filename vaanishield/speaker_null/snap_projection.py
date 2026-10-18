@@ -1,26 +1,25 @@
-"""
+r"""
 Speaker-nulled global artifact stream.
 
-Self-supervised speech encoders (WavLM, wav2vec2) produce embeddings dominated by
-speaker identity ("speaker entanglement"), which hurts generalization to callers not
-seen during training -- a model can end up recognizing specific speakers rather than
-detecting synthesis artifacts. This module implements an orthogonal speaker-subspace
-projection (a "SNAP"-style approach, see docs/TRD.md section 3.3) to suppress the
-speaker-identity component of the embedding and retain an artifact-dominant residual.
+Self-supervised and acoustic speech encoders produce embeddings heavily influenced by
+speaker identity ("speaker entanglement"), which hurts generalization to unseen callers:
+a classifier risks memorizing training speaker traits rather than generalizing to synthesis
+artifacts. This module implements orthogonal speaker-subspace projection (SNAP: Speaker-Nulling
+Artifact Projection) to project speech representations onto the orthogonal complement of the
+between-speaker subspace, stripping identity and isolating residual acoustic synthesis artifacts.
 
-High-level approach:
-    1. Estimate a "speaker subspace" -- e.g. via a speaker-verification embedding model,
-       or by computing the principal subspace spanned by many speakers' mean embeddings.
-    2. Project the per-utterance SSL embedding onto the orthogonal complement of that
-       subspace, removing the components most predictive of speaker identity.
-    3. The residual is the "speaker-nulled" embedding used downstream in fusion/.
-
-TODO(agent): read the SNAP paper (referenced in docs/TRD.md and the abstract PDF) for the
-precise formulation before implementing -- this stub only sketches the interface.
+Mathematical formulation:
+    1. Given bona-fide training speakers s in S, compute speaker mean centroids:
+       \bar{e}_s = (1 / N_s) \sum_{i \in s} e_i
+    2. Compute the top-k principal components U \in R^{D \times k} of between-speaker covariance:
+       U = argmax \sum_s ||U^T (\bar{e}_s - \mu)||^2, s.t. U^T U = I
+    3. Project any test utterance embedding e onto the orthogonal complement:
+       e_null = (I - U U^T) e = e - U (U^T e)
+    4. Normalize e_null to unit length for downstream fusion classification.
 """
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LogisticRegression
@@ -37,7 +36,7 @@ logger = get_logger("snap_projection")
 class SpeakerNullingProjector:
     """Speaker-nulling projection stream (SNAP-style orthogonal complement projection).
 
-    Suppresses the speaker-identity subspace from SSL speech representations to eliminate
+    Suppresses the speaker-identity subspace from speech representations to eliminate
     speaker entanglement and isolate synthesis/cloning artifact residuals.
     """
     ssl_backbone: str = "microsoft/wavlm-base-plus"
@@ -47,13 +46,18 @@ class SpeakerNullingProjector:
     def fit_speaker_subspace(
         self,
         reference_embeddings: np.ndarray,
+        speaker_ids: Optional[List[str]] = None,
         n_components: int = 16,
     ) -> None:
-        """Estimate the principal speaker subspace U via PCA over reference speaker embeddings.
+        """Estimate the principal speaker subspace U via PCA over speaker centroid representations.
+
+        When speaker_ids are supplied, computes speaker-level centroid mean embeddings
+        bar{e}_s = (1/N_s) sum_{i in s} e_i to prevent within-utterance noise, channel artifacts,
+        or class variance from contaminating the speaker identity subspace.
 
         Args:
-            reference_embeddings: Array of shape (N, D) representing utterance embeddings
-                across multiple distinct speakers.
+            reference_embeddings: Array of shape (N, D) representing utterance embeddings.
+            speaker_ids: Optional list of speaker IDs corresponding to each row.
             n_components: Dimension k of the speaker subspace to null out.
         """
         if reference_embeddings.ndim != 2:
@@ -61,16 +65,29 @@ class SpeakerNullingProjector:
 
         n_samples, dim = reference_embeddings.shape
         self.embedding_dim = dim
-        k = min(n_components, n_samples - 1, dim)
+
+        if speaker_ids is not None and len(speaker_ids) == n_samples:
+            unique_speakers = list(dict.fromkeys(speaker_ids))
+            speaker_centroids = []
+            for spk in unique_speakers:
+                mask = [s == spk for s in speaker_ids]
+                spk_embs = reference_embeddings[mask]
+                speaker_centroids.append(np.mean(spk_embs, axis=0))
+            fit_matrix = np.array(speaker_centroids, dtype=np.float32)
+        else:
+            fit_matrix = reference_embeddings
+
+        n_pts, d = fit_matrix.shape
+        k = max(1, min(n_components, n_pts - 1, d))
 
         pca = PCA(n_components=k, svd_solver="randomized", random_state=42)
-        pca.fit(reference_embeddings)
+        pca.fit(fit_matrix)
 
         # components_ has shape (k, dim) -> transpose to (dim, k)
         self.speaker_subspace = pca.components_.T.astype(np.float32)
         logger.info(
-            f"Fitted speaker subspace with {k} components (explained variance ratio sum: "
-            f"{float(np.sum(pca.explained_variance_ratio_)):.4f})."
+            f"Fitted speaker subspace with {k} components across {n_pts} speaker points "
+            f"(explained variance ratio sum: {float(np.sum(pca.explained_variance_ratio_)):.4f})."
         )
 
     def embed(self, audio_path: str, sr: int = 16000) -> np.ndarray:

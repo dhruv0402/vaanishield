@@ -93,67 +93,9 @@ def fetch_zip_entry(url: str, entry_info: tuple) -> bytes:
         raise RuntimeError(f"Unsupported compression method: {comp_method}")
 
 
-def synthesize_neural_vocoder_clone(
-    source_wav_path: str,
-    output_wav_path: str,
-    is_heldout: bool = False,
-    seed: int = 42,
-) -> None:
-    """Synthesize realistic neural voice clone counterpart with neural vocoder phase-smoothing,
-    pitch contour quantization, and cross-lingual boundary seam discontinuity.
-    Matches the 24 kHz XTTS v2 / OpenVoice neural synthesis profile.
-    """
-    y, sr = sf.read(source_wav_path, dtype="float32")
-    if y.ndim > 1:
-        y = np.mean(y, axis=1)
-
-    target_sr = 24000
-    if sr != target_sr:
-        num_samples = int(round(len(y) * target_sr / sr))
-        y = scipy.signal.resample(y, num_samples).astype(np.float32)
-        sr = target_sr
-
-    rng = np.random.RandomState(seed)
-
-    # 1. Time-scale stretch slightly (like autoregressive token decoding duration variance)
-    stretch = 0.92 if not is_heldout else 0.96
-    new_len = int(len(y) * stretch)
-    y_stretched = scipy.signal.resample(y, new_len).astype(np.float32)
-
-    # 2. STFT phase smoothing & spectral envelope quantization (characteristic of HiFi-GAN / vocoder synthesis)
-    n_fft = 1024
-    hop = 256
-    f, t, Zxx = scipy.signal.stft(y_stretched, fs=sr, nperseg=n_fft, noverlap=n_fft - hop)
-    mag = np.abs(Zxx)
-    phase = np.angle(Zxx)
-
-    # Smooth magnitude across time frames (over-smoothing of formant transitions in neural TTS)
-    kernel_size = 5 if not is_heldout else 4
-    kernel = np.ones((1, kernel_size)) / kernel_size
-    mag_smooth = scipy.signal.convolve2d(mag, kernel, mode="same", boundary="symm")
-
-    # Inject subtle vocoder phase jitter & boundary seam phase reset at 35% and 65% of utterance
-    n_frames = Zxx.shape[1]
-    b1, b2 = int(0.35 * n_frames), int(0.65 * n_frames)
-    phase_mod = phase.copy()
-    phase_mod[:, b1:b2] += 0.45 if not is_heldout else -0.38
-    # Add high-frequency vocoder harmonic regularity above 3.5 kHz
-    hf_bins = f > 3500
-    mag_smooth[hf_bins, :] *= 0.78 if not is_heldout else 0.82
-
-    Zxx_mod = mag_smooth * np.exp(1j * phase_mod)
-    _, y_syn = scipy.signal.istft(Zxx_mod, fs=sr, nperseg=n_fft, noverlap=n_fft - hop)
-    y_syn = y_syn.astype(np.float32)
-
-    # 3. Normalize RMS to ~0.13 - 0.16 (overlapping bona-fide RMS range)
-    curr_rms = float(np.sqrt(np.mean(y_syn ** 2)))
-    target_rms = 0.135 + 0.015 * (seed % 3)
-    if curr_rms > 1e-6:
-        y_syn = y_syn * (target_rms / curr_rms)
-    y_syn = np.clip(y_syn, -0.98, 0.98).astype(np.float32)
-
-    Path(output_wav_path).parent.mkdir(parents=True, exist_ok=True)
-    sf.write(output_wav_path, y_syn, sr)
+# Note: Synthetic voice clones must be generated using authentic neural synthesizers
+# (e.g. Coqui XTTS v2 for Hindi/English, or AI4Bharat Indic-TTS / IndicF5 for Dravidian languages).
+# Heuristic DSP vocoder filtering (phase modulation / spectral smoothing) is prohibited per research integrity.
 
 
 def main():
@@ -240,7 +182,7 @@ def main():
         },
     ]
 
-    # 1. Update consented_speakers.csv and create signed consent forms
+    # 1. Update consented_speakers.csv registry with documented corpus licenses
     consent_csv_path = Path("data/consent_forms/consented_speakers.csv")
     existing_consents = {}
     with open(consent_csv_path, "r", encoding="utf-8") as f:
@@ -248,42 +190,24 @@ def main():
         for row in reader:
             existing_consents[row["speaker_id"]] = row
 
-    signed_dir = Path("data/consent_forms/signed")
-    signed_dir.mkdir(parents=True, exist_ok=True)
-
     for cfg in new_speaker_configs:
         spk_id = cfg["speaker_id"]
-        form_id = f"form_{spk_id}"
         existing_consents[spk_id] = {
             "speaker_id": spk_id,
             "speaker_name": cfg["speaker_name"],
-            "form_id": form_id,
-            "consent_signed": "true",
-            "consent_date": "2026-09-01",
-            "regional_language": cfg["regional_language"],
+            "corpus_source": cfg.get("corpus_source", f"OpenSLR ({cfg['regional_language']})"),
+            "consent_status": "public_academic_license",
             "source_license": cfg["source_license"],
+            "regional_language": cfg["regional_language"],
         }
-        form_md = signed_dir / f"{form_id}.md"
-        form_md.write_text(
-            f"# Signed Voice Recording & Cloning Consent Verification\n"
-            f"Participant ID: {spk_id}\n"
-            f"Source: {cfg['speaker_name']}\n"
-            f"Status: Verified & Consented under {cfg['source_license']}\n"
-            f"Form ID: {form_id}\n"
-            f"Date: 2026-09-01\n"
-            f"Research Project: VaaniShield\n"
-            f"Scope: Audio feature analysis, acoustic boundary extraction, zero-shot neural voice cloning benchmark.\n",
-            encoding="utf-8",
-        )
 
     fieldnames = [
         "speaker_id",
         "speaker_name",
-        "form_id",
-        "consent_signed",
-        "consent_date",
-        "regional_language",
+        "corpus_source",
+        "consent_status",
         "source_license",
+        "regional_language",
     ]
     with open(consent_csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)

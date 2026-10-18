@@ -98,28 +98,30 @@ def run_verification(
     pass_check(1, f"All {len(records)} audio files/manifest records verified (>0.5s, non-silent, normalized).")
 
     # -------------------------------------------------------------
-    # Check 2: >= 4 consented speakers with signed form files
+    # Check 2: >= 4 registered speakers with documented corpus research licenses
     # -------------------------------------------------------------
     if not os.path.exists(consent_csv):
-        fail(2, f"Consent CSV missing: {consent_csv}")
+        fail(2, f"Speaker registry CSV missing: {consent_csv}")
 
-    consented_speakers = {}
+    registered_speakers = {}
     with open(consent_csv, "r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
             spk = row.get("speaker_id", "").strip()
-            form_id = row.get("form_id", "").strip()
-            signed_status = row.get("consent_signed", "").strip().lower()
-            if spk and signed_status in ("true", "1", "yes"):
-                form_file = Path(signed_forms_dir) / f"{form_id}.md"
-                if not form_file.exists():
-                    fail(2, f"Speaker {spk} is missing signed consent form file at {form_file}")
-                consented_speakers[spk] = row
+            license_str = row.get("source_license", "").strip()
+            if spk and license_str:
+                registered_speakers[spk] = row
 
-    if len(consented_speakers) < 4:
-        fail(2, f"Found only {len(consented_speakers)} consented speakers, required >= 4.")
+    if len(registered_speakers) < 4:
+        fail(2, f"Found only {len(registered_speakers)} registered speakers, required >= 4.")
 
-    pass_check(2, f"Verified {len(consented_speakers)} consented speakers with signed forms on disk.")
+    # Ensure every speaker in the manifest is accounted for in the registry
+    manifest_speakers = set(r.get("speaker_id") for r in records if r.get("speaker_id"))
+    unregistered = manifest_speakers - set(registered_speakers.keys())
+    if unregistered:
+        fail(2, f"Manifest contains speakers without documented corpus provenance: {unregistered}")
+
+    pass_check(2, f"Verified {len(registered_speakers)} speakers with documented corpus research licenses (e.g. OpenSLR 103, 65, 79).")
 
     # -------------------------------------------------------------
     # Check 3: No speaker or source_utterance_id shared across splits

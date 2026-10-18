@@ -3,28 +3,32 @@ import os
 import pickle
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 import numpy as np
 import yaml
-from fastapi import FastAPI, File, Form, UploadFile, HTTPException, WebSocket, WebSocketDisconnect, Header, BackgroundTasks
+from fastapi import FastAPI, File, Form, UploadFile, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import time
-import uuid
 
-from vaanishield.boundary.localization import find_codeswitch_points
+from vaanishield.boundary.localization import find_codeswitch_points, CodeSwitchPoint
 from vaanishield.boundary.features import extract_boundary_features, aggregate_boundary_features
-from vaanishield.utils.audio_io import load_audio
+from vaanishield.utils.audio_io import load_audio, save_audio
 from vaanishield.fusion.explain import explain_prediction
 
-app = FastAPI(title="VaaniShield Enterprise Security API", version="2.0.0")
+app = FastAPI(title="VaaniShield Research & Detection API", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,90 +42,24 @@ PROJECTOR = None
 CFG = None
 WHISPER_MODEL = None
 
+
 def get_whisper():
     global WHISPER_MODEL
     if WHISPER_MODEL is None:
         try:
             import whisper
-            # Load the base multilingual model (supports Hindi, Tamil, Telugu, Kannada, English)
             WHISPER_MODEL = whisper.load_model("base")
         except Exception as e:
-            print(f"[ASR Warning] Could not load whisper model: {e}")
+            print(f"[ASR Warning] Whisper model not loaded: {e}")
             WHISPER_MODEL = False
     return WHISPER_MODEL if WHISPER_MODEL is not False else None
 
-# In-Memory Enterprise SaaS Multi-Tenant Datastores
-API_KEYS = {
-    "vs_live_bank_alpha_9921": {"org": "State Bank Security Ops", "plan": "Enterprise Tier", "quota": 100000, "used": 142},
-    "vs_live_fintech_beta_4410": {"org": "Fintech PayShield", "plan": "Growth Tier", "quota": 25000, "used": 89},
-    "vs_test_sandbox_1234": {"org": "Sandbox Developer", "plan": "Developer Tier", "quota": 1000, "used": 18},
-}
-
-CALL_AUDIT_LOGS = [
-    {
-        "call_id": "call_ind_99201",
-        "timestamp": "2026-10-06T01:10:14Z",
-        "org": "State Bank Security Ops",
-        "caller_id": "+91-98765-XXXXX",
-        "channel": "Inbound SIP Trunk (IVR)",
-        "duration_sec": 3.4,
-        "language_pair": "hi-en",
-        "spoof_probability": 0.942,
-        "is_spoof": True,
-        "action_taken": "TRANSACTION_FROZEN",
-        "alert_level": "CRITICAL"
-    },
-    {
-        "call_id": "call_ind_99202",
-        "timestamp": "2026-10-06T01:12:30Z",
-        "org": "State Bank Security Ops",
-        "caller_id": "+91-98112-XXXXX",
-        "channel": "WhatsApp Audio Gateway",
-        "duration_sec": 4.1,
-        "language_pair": "hi-en",
-        "spoof_probability": 0.081,
-        "is_spoof": False,
-        "action_taken": "CALL_VERIFIED",
-        "alert_level": "SECURE"
-    },
-    {
-        "call_id": "call_ind_99203",
-        "timestamp": "2026-10-06T01:14:02Z",
-        "org": "Fintech PayShield",
-        "caller_id": "+91-97401-XXXXX",
-        "channel": "Contact Center Telephony",
-        "duration_sec": 2.9,
-        "language_pair": "kn-en",
-        "spoof_probability": 0.884,
-        "is_spoof": True,
-        "action_taken": "ROUTED_TO_SPECIALIST",
-        "alert_level": "CRITICAL"
-    }
-]
-
-REGISTERED_WEBHOOKS = [
-    {"id": "wh_01", "url": "https://api.banksecurity.in/v1/fraud-alerts", "events": ["spoof_detected", "call_flagged"], "status": "ACTIVE"}
-]
-
-class WebhookConfig(BaseModel):
-    url: str
-    events: list[str] = ["spoof_detected"]
-
-def verify_api_key(x_api_key: Optional[str] = None):
-    """Enforce API key authentication with sandbox fallback for web demo."""
-    if not x_api_key:
-        return {"org": "Public Web Console", "plan": "Demo Tier"}
-    if x_api_key not in API_KEYS:
-        raise HTTPException(status_code=401, detail="Invalid API Key. Unauthorized.")
-    tenant = API_KEYS[x_api_key]
-    tenant["used"] += 1
-    return tenant
 
 def get_pipeline():
     global MODEL, PROJECTOR, CFG
     if MODEL is None:
         if not os.path.exists(CHECKPOINT_PATH):
-            raise RuntimeError(f"Checkpoint not found at {CHECKPOINT_PATH}")
+            raise RuntimeError(f"Checkpoint not found at {CHECKPOINT_PATH}. Run scripts/train.py first.")
         with open(CHECKPOINT_PATH, "rb") as f:
             data = pickle.load(f)
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
@@ -130,23 +68,11 @@ def get_pipeline():
         PROJECTOR = data["projector"]
     return MODEL, PROJECTOR, CFG
 
+
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "VaaniShield Detection API"}
+    return {"status": "ok", "service": "VaaniShield Detection API", "version": "2.0.0"}
 
-@app.get("/api/sessions")
-def get_sessions():
-    return {
-        "status": "active",
-        "active_sessions": [
-            {
-                "session_id": "sess_default_01",
-                "org": "State Bank Security Ops",
-                "tier": "Enterprise Multi-Stream Gate",
-                "status": "PROTECTED",
-            }
-        ]
-    }
 
 SAMPLE_CATALOG = [
     {
@@ -175,7 +101,7 @@ SAMPLE_CATALOG = [
     },
     {
         "id": "sample_kannada_bonafide",
-        "name": "[UNSEEN TEST SPLIT] Authentic Human — Kannada-English (spk_kn_02)",
+        "name": "[UNSEEN TEST SPLIT] Authentic Human — Kannada-English (OpenSLR 79 spk_kn_02)",
         "path": "data/raw/spk_kn_02_knm_00271_00003824418.wav",
         "transcript": "Nimma bank account block agide, verify your account details immediately.",
         "expected": "bonafide",
@@ -183,7 +109,7 @@ SAMPLE_CATALOG = [
     },
     {
         "id": "sample_tamil_cloned",
-        "name": "[UNSEEN VAL SPLIT] Cloned Voice — Tamil-English (spk_ta_02 XTTS)",
+        "name": "[UNSEEN VAL SPLIT] Cloned Voice — Tamil-English (spk_ta_02)",
         "path": "data/processed/train_clones/spk_ta_02_utt_025_xtts.wav",
         "transcript": "Unga bank account freeze aayiduchu, verify your details immediately.",
         "expected": "spoof",
@@ -191,7 +117,7 @@ SAMPLE_CATALOG = [
     },
     {
         "id": "sample_heldout_cloned",
-        "name": "[UNSEEN HELDOUT SPLIT] Cloned Voice — Held-Out Synthesizer (spk_5945)",
+        "name": "[UNSEEN HELDOUT SPLIT] Cloned Voice — Unseen Held-Out Speaker (spk_5945)",
         "path": "data/processed/train_clones/spk_5945_utt_015_xtts.wav",
         "transcript": "Mera account freeze ho gaya hai, please verify the transaction now.",
         "expected": "spoof",
@@ -202,9 +128,11 @@ SAMPLE_MAP = {item["id"]: item["path"] for item in SAMPLE_CATALOG}
 SAMPLE_LANG_MAP = {item["id"]: item["language_pair"] for item in SAMPLE_CATALOG}
 SAMPLE_TRANSCRIPT_MAP = {item["id"]: item["transcript"] for item in SAMPLE_CATALOG}
 
+
 @app.get("/api/samples")
 def get_samples():
     return SAMPLE_CATALOG
+
 
 @app.get("/api/audio/{sample_id}")
 def get_sample_audio(sample_id: str):
@@ -213,170 +141,116 @@ def get_sample_audio(sample_id: str):
         raise HTTPException(status_code=404, detail=f"Audio sample not found: {sample_id}")
     return FileResponse(audio_path, media_type="audio/wav")
 
+
 @app.post("/api/analyze")
 async def analyze_audio(
     file: Optional[UploadFile] = File(None),
     sample_id: Optional[str] = Form(None),
     transcript: Optional[str] = Form(None),
-    caller_id: Optional[str] = Form("+91-98765-XXXXX"),
-    channel: Optional[str] = Form("Inbound Telephony Gateway"),
-    x_api_key: Optional[str] = Header(None),
 ):
-    tenant = verify_api_key(x_api_key)
-    try:
-        model, projector, cfg = get_pipeline()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+    """Run dual-stream detection pipeline on uploaded audio or catalog sample."""
     tmp_path = None
-    if file is not None:
-        suffix = Path(file.filename).suffix or ".wav"
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            content = await file.read()
-            if len(content) == 0:
-                raise HTTPException(status_code=400, detail="Empty audio file provided.")
-            tmp.write(content)
-            tmp_path = tmp.name
-        audio_path = tmp_path
-    elif sample_id:
-        audio_path = SAMPLE_MAP.get(sample_id)
-        if not audio_path or not os.path.exists(audio_path):
-            raise HTTPException(status_code=400, detail=f"Invalid or missing sample: {sample_id}")
-    else:
-        raise HTTPException(status_code=400, detail="Either file upload or sample_id must be provided.")
-
     try:
-        audio, sr = load_audio(audio_path)
-        duration_sec = float(len(audio) / sr)
-
-        transcription_method = "user_provided"
-        if transcript and transcript.strip():
-            effective_transcript = transcript.strip()
-        elif sample_id and sample_id in SAMPLE_TRANSCRIPT_MAP:
-            effective_transcript = SAMPLE_TRANSCRIPT_MAP[sample_id]
-            transcription_method = "preset_catalog"
+        if file and file.filename:
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                tmp_path = tmp.name
+                content = await file.read()
+                tmp.write(content)
+            audio_source = tmp_path
+            target_transcript = transcript
+            lang_pair = "hi-en"
+        elif sample_id:
+            audio_source = SAMPLE_MAP.get(sample_id)
+            if not audio_source or not os.path.exists(audio_source):
+                raise HTTPException(status_code=404, detail=f"Preset sample not found: {sample_id}")
+            target_transcript = transcript or SAMPLE_TRANSCRIPT_MAP.get(sample_id, "")
+            lang_pair = SAMPLE_LANG_MAP.get(sample_id, "hi-en")
         else:
-            whisper_engine = get_whisper()
-            if whisper_engine:
-                try:
-                    asr_res = whisper_engine.transcribe(audio_path)
-                    effective_transcript = asr_res.get("text", "").strip()
-                    transcription_method = "whisper_asr_auto"
-                except Exception as asr_err:
-                    print(f"[ASR Error] Transcription failed: {asr_err}")
-                    effective_transcript = "Mera laptop start nahi ho raha, can you check the battery?"
-                    transcription_method = "fallback_default"
-            else:
-                effective_transcript = "Mera laptop start nahi ho raha, can you check the battery?"
-                transcription_method = "fallback_default"
+            raise HTTPException(status_code=400, detail="Either 'file' or 'sample_id' must be provided.")
 
+        model, projector, cfg = get_pipeline()
+        audio_data, sr = load_audio(audio_source)
+        duration_sec = len(audio_data) / sr
+
+        # 1. Automatic Speech Recognition fallback if no transcript provided
+        transcription_method = "user_provided"
+        effective_transcript = target_transcript
         if not effective_transcript:
-            effective_transcript = "Mera laptop start nahi ho raha, can you check the battery?"
+            asr = get_whisper()
+            if asr:
+                try:
+                    res = asr.transcribe(audio_source, task="transcribe")
+                    effective_transcript = res.get("text", "").strip()
+                    transcription_method = "whisper_base_multilingual"
+                except Exception as e:
+                    print(f"ASR error: {e}")
+                    effective_transcript = "Mera account verify kijiye please"
+                    transcription_method = "fallback_mock"
+            else:
+                effective_transcript = "Mera account verify kijiye please"
+                transcription_method = "fallback_mock"
 
-        tokens = [t.strip() for t in effective_transcript.split() if t.strip()]
+        tokens = effective_transcript.split()
 
+        # 2. Localize code-switch points
         points = find_codeswitch_points(
-            audio_path=audio_path,
+            audio_path=audio_source,
             transcript_tokens=tokens,
+            lid_model="fasttext-lid176",
+            alignment_backend="whisper",
             window_ms_before=300,
             window_ms_after=300,
         )
 
-        b_feats = extract_boundary_features(audio_path, points)
-        agg_boundary_vector = aggregate_boundary_features(b_feats, aggregation="mean_and_max")
+        # 3. Boundary-local features
+        b_feats = extract_boundary_features(audio_source, points)
+        agg_vec = aggregate_boundary_features(b_feats, aggregation="mean_and_max")
 
-        raw_emb = projector.embed(audio_path)
+        # 4. Speaker-nulled global embedding
+        raw_emb = projector.embed(audio_source)
         nulled_emb = projector.project(raw_emb)
 
+        # 5. Fusion inference with calibrated probability and bootstrap CI
         probs, ci_low, ci_high = model.predict_with_ci(
-            agg_boundary_vector.reshape(1, -1),
+            agg_vec.reshape(1, -1),
             nulled_emb.reshape(1, -1),
-            n_bootstrap=500,
+            n_bootstrap=100,
             ci=0.95,
         )
-
         prob_val = float(probs[0])
         ci_low_val = float(ci_low[0])
         ci_high_val = float(ci_high[0])
 
-        fused_vec = model.transform_features(agg_boundary_vector, nulled_emb)
-        raw_explanations = explain_prediction(
-            fused_vec,
-            model._calibrator,
-            points,
+        is_spoof = prob_val >= 0.5
+        decision_action = model.predict_operational_tier(prob_val)
+
+        if decision_action == "BLOCK_AND_ALERT":
+            risk_level = "CRITICAL"
+            action_taken = "CALL_BLOCKED"
+        elif decision_action == "STEP_UP_AUTH":
+            risk_level = "ELEVATED"
+            action_taken = "STEP_UP_REQUIRED"
+        else:
+            risk_level = "SECURE"
+            action_taken = "VERIFIED_GENUINE"
+
+        # 6. Privacy-compliant acoustic explanations (zero transcript leakage)
+        fused_vector = np.concatenate([agg_vec, nulled_emb])
+        raw_model = getattr(model, "model_", model)
+        explanations = explain_prediction(
+            fused_feature_vector=fused_vector,
+            model=raw_model,
+            codeswitch_points=points,
             boundary_vectors=b_feats,
             overall_spoof_prob=prob_val,
         )
 
-        explanations = [
-            {
-                "boundary_index": exp["boundary_index"],
-                "timestamp_sec": float(exp["timestamp_sec"]),
-                "window_start_sec": float(exp.get("window_start_sec", max(0.0, exp["timestamp_sec"] - 0.3))),
-                "window_end_sec": float(exp.get("window_end_sec", exp["timestamp_sec"] + 0.3)),
-                "language_transition": exp.get("language_transition", "HI -> EN"),
-                "primary_acoustic_cue": exp["primary_acoustic_cue"],
-                "contribution_score": float(exp["contribution_score"]),
-                "description": exp["description"],
-                "features": exp.get("features", {}),
-            }
-            for exp in raw_explanations
-        ]
-
-        # Compute downsampled 80-bin peak envelope for visual seam timeline
-        n_bins = min(80, max(10, len(audio)))
-        peak_val = float(np.max(np.abs(audio))) if len(audio) > 0 else 1.0
-        if peak_val < 1e-6:
-            peak_val = 1.0
-        waveform_peaks = [
-            round(float(np.max(np.abs(chunk)) / peak_val), 3)
-            for chunk in np.array_split(audio, n_bins)
-        ]
-
-        # Evaluate two-tier operational decision policy (0.48 review, 0.52 block)
-        tier_results = model.predict_operational_tier(
-            agg_boundary_vector.reshape(1, -1),
-            nulled_emb.reshape(1, -1),
-            tau_review=0.48,
-            tau_block=0.52,
-        )
-        tier_decision = tier_results[0]
-        decision_action = tier_decision["decision"]  # PASS, STEP_UP_REVIEW, BLOCK
-        risk_level = tier_decision["risk_tier"]      # LOW, SUSPICIOUS, CRITICAL
-
-        is_spoof = prob_val >= 0.50
-        classification = "SPOOF / CLONED" if is_spoof else "BONA-FIDE HUMAN"
-        action_taken = "TRANSACTION_FROZEN_BLOCK" if decision_action == "BLOCK" else (
-            "STEP_UP_VOICE_OTP_REQUIRED" if decision_action == "STEP_UP_REVIEW" else "CALL_CLEARED_PASS"
-        )
-
-        # Determine language pair dynamically
-        lang_pair = SAMPLE_LANG_MAP.get(sample_id, "hi-en") if sample_id else "hi-en"
-
-        # Log to SaaS Audit Trail
-        call_id = f"call_{uuid.uuid4().hex[:8]}"
-        audit_record = {
-            "call_id": call_id,
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "org": tenant["org"],
-            "caller_id": caller_id,
-            "channel": channel,
-            "duration_sec": round(duration_sec, 2),
-            "language_pair": lang_pair,
-            "spoof_probability": round(prob_val, 3),
-            "is_spoof": is_spoof,
-            "action_taken": action_taken,
-            "alert_level": risk_level,
-        }
-        CALL_AUDIT_LOGS.insert(0, audit_record)
-        if len(CALL_AUDIT_LOGS) > 50:
-            CALL_AUDIT_LOGS.pop()
+        # Downsample waveform for frontend visualization
+        step = max(1, len(audio_data) // 120)
+        waveform_peaks = [float(abs(audio_data[i])) for i in range(0, len(audio_data), step)][:120]
 
         return {
-            "success": True,
-            "call_id": call_id,
-            "tenant": tenant["org"],
-            "classification": classification,
+            "status": "success",
             "is_spoof": is_spoof,
             "spoof_probability": prob_val,
             "confidence_interval_95": [ci_low_val, ci_high_val],
@@ -397,7 +271,7 @@ async def analyze_audio(
                 "language_pair": lang_pair,
                 "waveform_peaks": waveform_peaks,
             },
-            "explanations": explanations
+            "explanations": explanations,
         }
 
     except Exception as e:
@@ -424,45 +298,9 @@ def get_evaluation_reports():
     }
 
 
-@app.get("/api/threats")
-def get_threat_logs(x_api_key: Optional[str] = Header(None)):
-    """Retrieve multi-tenant live call threat activity stream."""
-    _ = verify_api_key(x_api_key)
-    return {
-        "active_call_streams": len(CALL_AUDIT_LOGS),
-        "threat_ratio_percent": round(
-            sum(1 for c in CALL_AUDIT_LOGS if c["is_spoof"]) / max(1, len(CALL_AUDIT_LOGS)) * 100, 1
-        ),
-        "logs": CALL_AUDIT_LOGS
-    }
-
-
-@app.get("/api/webhooks")
-def list_webhooks():
-    return REGISTERED_WEBHOOKS
-
-
-@app.post("/api/webhooks")
-def create_webhook(config: WebhookConfig):
-    wh = {
-        "id": f"wh_{uuid.uuid4().hex[:6]}",
-        "url": config.url,
-        "events": config.events,
-        "status": "ACTIVE",
-        "created_at": time.strftime("%Y-%m-%d %H:%M:%S")
-    }
-    REGISTERED_WEBHOOKS.append(wh)
-    return wh
-
-
 @app.websocket("/ws/stream_analyze")
 async def websocket_stream_analyze(websocket: WebSocket):
-    """Real-time streaming WebSocket endpoint for continuous live call analysis.
-    
-    Accepts binary PCM / Float32 audio chunks from the client microphone,
-    maintains a rolling buffer, extracts acoustic transition features,
-    and streams dynamic risk probabilities and telemetry gauges.
-    """
+    """Real-time streaming WebSocket endpoint for continuous audio chunk analysis."""
     await websocket.accept()
     model, projector, cfg = get_pipeline()
     buffer = np.zeros(0, dtype=np.float32)
@@ -471,11 +309,9 @@ async def websocket_stream_analyze(websocket: WebSocket):
 
     try:
         while True:
-            # Receive binary audio chunk or JSON message
             data = await websocket.receive()
             if "bytes" in data and data["bytes"]:
                 chunk_bytes = data["bytes"]
-                # Convert 16-bit PCM or Float32 to float array
                 try:
                     chunk = np.frombuffer(chunk_bytes, dtype=np.float32)
                 except Exception:
@@ -489,11 +325,9 @@ async def websocket_stream_analyze(websocket: WebSocket):
                 if len(buffer) > max_buffer_len:
                     buffer = buffer[-max_buffer_len:]
 
-                # Analyze every ~1 second of accumulated audio (at least 1.5s total)
                 if len(buffer) >= int(1.2 * sr):
                     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_chunk:
                         tmp_chunk_path = tmp_chunk.name
-                    from vaanishield.utils.audio_io import save_audio
                     save_audio(tmp_chunk_path, buffer, sr)
 
                     try:
@@ -511,7 +345,7 @@ async def websocket_stream_analyze(websocket: WebSocket):
                         probs, ci_l, ci_h = model.predict_with_ci(
                             agg_vec.reshape(1, -1),
                             nulled_emb.reshape(1, -1),
-                            n_bootstrap=100,
+                            n_bootstrap=50,
                             ci=0.95,
                         )
                         prob_val = float(probs[0])
@@ -547,7 +381,6 @@ async def websocket_stream_analyze(websocket: WebSocket):
             pass
 
 
-# Serve compiled production frontend if web/dist exists
 WEB_DIST_DIR = Path("web/dist")
 if WEB_DIST_DIR.is_dir():
     app.mount("/", StaticFiles(directory=str(WEB_DIST_DIR), html=True), name="frontend")
@@ -556,4 +389,3 @@ if WEB_DIST_DIR.is_dir():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8000)
-

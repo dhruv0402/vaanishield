@@ -44,12 +44,20 @@ def extract_lfcc(
     Uses linearly spaced filterbanks rather than mel scale, as widely reported
     in speech anti-spoofing and Indian-accented speech deepfake detection literature.
     """
-    # Linear filterbank
-    linear_fb = librosa.filters.mel(
-        sr=sr, n_fft=n_fft, n_mels=n_filter, fmin=0.0, fmax=sr / 2.0, htk=False, norm=None
-    )
-    # Re-scale filters linearly
-    linear_fb = np.linspace(0, 1, n_filter)[:, None] * np.ones((n_filter, 1 + n_fft // 2))
+    # Linear filterbank (triangular linearly spaced filters)
+    fmin = 0.0
+    fmax = sr / 2.0
+    fft_freqs = np.linspace(0, fmax, 1 + n_fft // 2)
+    filter_freqs = np.linspace(fmin, fmax, n_filter + 2)
+    linear_fb = np.zeros((n_filter, len(fft_freqs)), dtype=np.float32)
+    for i in range(n_filter):
+        left, center, right = filter_freqs[i], filter_freqs[i + 1], filter_freqs[i + 2]
+        up_mask = (fft_freqs >= left) & (fft_freqs <= center)
+        if center > left:
+            linear_fb[i, up_mask] = (fft_freqs[up_mask] - left) / (center - left)
+        down_mask = (fft_freqs >= center) & (fft_freqs <= right)
+        if right > center:
+            linear_fb[i, down_mask] = (right - fft_freqs[down_mask]) / (right - center)
 
     D = np.abs(librosa.stft(y, n_fft=n_fft, hop_length=hop_length)) ** 2
     filter_banks = np.dot(linear_fb, D)

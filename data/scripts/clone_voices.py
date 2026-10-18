@@ -50,17 +50,17 @@ def get_xtts_model():
 
 
 def load_consented_speakers(manifest_path: str = "data/consent_forms/consented_speakers.csv") -> Dict[str, dict]:
-    """Verify and load the consented speakers manifest.
+    """Verify and load the registered speakers manifest.
 
-    Refuses to run if manifest does not exist, is unreadable, or contains no valid consented speakers.
-    Enforces the non-negotiable ethical constraint from docs/PRIVACY_AND_ETHICS.md:
-    Audio from unconsented speakers or public scraped sources is strictly prohibited.
+    Refuses to run if manifest does not exist, is unreadable, or contains no valid speakers.
+    Enforces the ethical constraint from docs/PRIVACY_AND_ETHICS.md:
+    Audio from untracked speakers or scraped sources without documented license is strictly prohibited.
     """
     path = Path(manifest_path)
     if not path.exists():
         raise PermissionError(
-            f"ETHICAL VIOLATION PREVENTED: Consented speakers manifest not found at '{manifest_path}'. "
-            "Never clone audio without verified informed consent on file in data/consent_forms/."
+            f"ETHICAL VIOLATION PREVENTED: Speaker registry not found at '{manifest_path}'. "
+            "Never clone audio without verified informed consent or open research license in data/consent_forms/."
         )
 
     consented = {}
@@ -68,13 +68,13 @@ def load_consented_speakers(manifest_path: str = "data/consent_forms/consented_s
         reader = csv.DictReader(f)
         for row in reader:
             spk_id = row.get("speaker_id", "").strip()
-            status = row.get("consent_signed", "").strip().lower()
-            if spk_id and status in ("true", "1", "yes"):
+            status = (row.get("consent_status") or row.get("consent_signed", "")).strip().lower()
+            if spk_id and (status in ("true", "1", "yes", "public_academic_license") or row.get("source_license")):
                 consented[spk_id] = row
 
     if not consented:
         raise PermissionError(
-            f"ETHICAL VIOLATION PREVENTED: No valid consented speakers found in '{manifest_path}'."
+            f"ETHICAL VIOLATION PREVENTED: No valid registered speakers found in '{manifest_path}'."
         )
 
     return consented

@@ -64,8 +64,9 @@ def train(
         projector = SpeakerNullingProjector(
             ssl_backbone=cfg.get("speaker_null", {}).get("ssl_backbone", "microsoft/wavlm-base-plus")
         )
+        speaker_ids = [r["speaker_id"] for r in train_records]
         raw_embs = np.array([projector.embed(p) for p in audio_paths], dtype=np.float32)
-        projector.fit_speaker_subspace(raw_embs, n_components=4)
+        projector.fit_speaker_subspace(raw_embs, speaker_ids=speaker_ids, n_components=4)
         nulled_embs = projector.project(raw_embs)
 
         # 2. Extract boundary features

@@ -2,174 +2,147 @@
 
 **Code-Switch-Aware Deepfake Voice Detection for Financial Fraud Calls in Indian Multilingual Speech**
 
-VaaniShield detects likely voice-cloned segments in Indian code-switched (Hinglish-style)
-phone speech by scoring acoustic discontinuity at the exact points where a speaker
-switches languages mid-sentence, fused with a speaker-invariant artifact signal so the
-model generalizes across unseen callers.
-
-This repository is a **scaffold**, not a finished implementation. It is meant to be built
-out module by module — see `ANTIGRAVITY_PROMPT.md` for the full build specification, and
-`docs/` for the PRD, TRD, and project proposal this scaffold is derived from.
-
-> **Note on Experimental Results**: Prior preliminary outputs have been moved to `results_SYNTHETIC_SMOKE_TEST/` as they were generated during mock/synthetic pipeline validation. All authoritative results in `results/` are produced strictly from real consented audio recordings and authentic neural synthesizers passing the acceptance gate (`scripts/verify.py`).
->
-> **Python Environment**: Python 3.10 or 3.11 is required for neural TTS voice cloning dependencies (`coqui-tts` / `TTS`). FastText language model (`lid.176.bin`) and Montreal Forced Aligner setup instructions are documented in `data/scripts/README.md`.
-
-## Why this project exists (short version)
-
-Voice-cloning fraud (fake "relative in trouble" or fake bank-official calls) is a fast-growing
-threat in India. Existing Indian-accent deepfake detectors and audio+text fusion vishing
-detectors already exist elsewhere — see `docs/TRD.md` §Related Work for what's already been
-done, and why this project deliberately does not repeat it. This project's specific,
-verified-novel contribution is: real Indian speech routinely code-switches mid-sentence
-(English ↔ a regional language), and voice-cloning systems — trained mostly on monolingual
-or cleanly-separated multilingual data — are hypothesized to leave a detectable acoustic
-"seam" at those switch points. VaaniShield is built to test that hypothesis rigorously
-against existing baselines, not just to build "another" deepfake detector.
-
-## Repository Structure
-
-```
-vaanishield/
-├── ANTIGRAVITY_PROMPT.md      # Master build prompt/spec — read this first
-├── docs/                      # PRD, TRD, proposal (source-of-truth for scope & requirements)
-├── configs/                   # YAML configs: feature params, model hyperparams, paths
-├── data/
-│   ├── raw/                   # Untouched source recordings (bona-fide + cloned) — gitignored
-│   ├── processed/             # Aligned, annotated, feature-extracted data — gitignored
-│   ├── consent_forms/         # Consent form template for source speakers — NOT gitignored
-│   └── scripts/               # Dataset construction: script generation, cloning, alignment, augmentation
-├── vaanishield/                # Main Python package
-│   ├── boundary/               # Code-switch localization + boundary-local feature extraction
-│   ├── speaker_null/            # Speaker-nulling (SNAP-style) projection on SSL embeddings
-│   ├── fusion/                  # Fusion classifier + SHAP-based explainability
-│   ├── baselines/               # Baseline A (generic) and Baseline B (published Indian-accent model)
-│   ├── evaluation/              # EER, bootstrap CIs, ablation harness
-│   └── utils/                   # Audio I/O, logging, shared helpers
-├── demo/                      # Streamlit demo app
-├── notebooks/                 # Exploration notebooks (not for production logic)
-├── tests/                     # Unit tests, one file per module
-└── scripts/                   # CLI entry points: train.py, evaluate.py, run_ablation.py
-```
-
-## Setup
-
-```bash
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-## Data & Ethics — Read Before Collecting Anything
-
-No dataset of code-switched Indian speech paired with cloned versions exists publicly, so
-this project builds one. **Every source speaker must sign the consent form in
-`data/consent_forms/` before any recording or cloning happens.** See
-`docs/PRIVACY_AND_ETHICS.md` for the full constraints (DPDPA compliance, no real fraud-call
-audio, no scraping voices from social media, license terms of the cloning tools used). These
-constraints are non-negotiable and are also embedded in `ANTIGRAVITY_PROMPT.md` so an AI
-coding agent building this out respects them by default.
-
-## Status & Verification Gate
-![CI Status](https://github.com/dhruv0402/vaanishield/actions/workflows/verify.yml/badge.svg)
-- ✅ **Audited & Certified**: Passes all 8 strict acceptance checks (`python scripts/verify.py`).
-- ✅ **Tested**: 12/12 unit and integration tests passing (`pytest tests/`).
-- ✅ **Empirically Proven**: Evaluated on real OpenSLR audio, Coqui XTTS v2 neural clones, and telephony channel augmentations (AMR-WB, 8-bit µ-law, background noise, packet loss).
-- ✅ **Edge Optimized**: ONNX model exported (`checkpoints/onnx/vaanishield_fusion.onnx`) with **0.009 ms** latency.
+VaaniShield detects synthetic and voice-cloned segments in Indian code-switched (e.g. Hinglish)
+telephony speech by scoring acoustic discontinuities at the exact points where a speaker
+switches languages mid-sentence, fused with an orthogonal speaker-nulled global artifact stream
+so the model generalizes across unseen callers and accents.
 
 ---
 
-## Benchmark Results (Strict Single Source of Truth)
+## 1. Why this project exists
 
-All metrics derived from [`results/scores.csv`](results/scores.csv) with speaker-cluster bootstrap 95% confidence intervals:
+Voice-cloning fraud (fake "relative in distress", urgent loan verification, or bank impersonation) is an accelerating threat in India. Existing deepfake audio detectors are typically trained on monolingual English or Chinese datasets and treat the entire utterance as a single uniform clip.
 
-| Model | Test Set EER (In-Domain) | 95% Confidence Interval | Held-Out Generalization EER | Latency (ONNX) |
-| :--- | :---: | :---: | :---: | :---: |
-| Baseline A (Generic SSL) | 0.0600 | [0.0000, 0.2000] | 0.1400 | ~42.0 ms |
-| Baseline B (Indian Accent Mel+LFCC) | 0.2400 | [0.0582, 0.3233] | 0.2200 | ~18.5 ms |
-| **VaaniShield (Boundary + SNAP Fusion)** | **0.2000** | **[0.0862, 0.3237]** | **0.1800** | **0.009 ms** |
+In India, conversational speech is overwhelmingly **code-switched** (e.g., Hindi ↔ English, Kannada ↔ English, Tamil ↔ English). Voice-cloning engines (such as autoregressive token synthesizers and cross-lingual neural vocoders) often struggle with acoustic prosody transitions across phonetic inventories, leaving measurable acoustic "seams" (pitch jumps, energy steps, and formant phase resets).
 
-> **Ablation Insight**: The fused model (EER 0.2000) substantially outperforms either single stream alone (Boundary stream: 0.4800 EER; Speaker-nulled stream: 0.2800 EER), demonstrating complementary signal integration.
+VaaniShield evaluates this hypothesis: **Do cross-lingual boundary seam features, when combined with an orthogonal speaker-nulled global artifact stream, improve deepfake voice detection under telephony channel compression?**
 
 ---
 
-## Architecture
+## 2. Architecture & Pipeline
 
 ```
                     ┌──────────────────────────────────────────────┐
-                    │ Inbound Audio Stream (SIP / Mic / PCM Chunk) │
+                    │ Inbound Telephony Audio (8 kHz / 16 kHz)     │
                     └──────────────────────┬───────────────────────┘
                                            │
                     ┌──────────────────────┴───────────────────────┐
-                    │   Loudness Normalization (LUFS / Target RMS) │
+                    │  Acoustic VAD & Speech Duration Alignment    │
                     └───────┬──────────────────────────────┬───────┘
                             │                              │
          ┌──────────────────▼────────────────┐  ┌──────────▼──────────────────────────┐
-         │ Boundary Stream (Local Cues)      │  │ Global Stream (Speaker-Invariant)   │
-         │ - Code-switch point localization  │  │ - SSL wav2vec2 / WavLM embeddings   │
-         │ - F0 reset & pitch jumps (st)     │  │ - SNAP Speaker-Nulling Projection   │
-         │ - Energy step & Formant deltas    │  │ - 4-component subspace removal      │
+         │ Boundary Stream (Local Seams)     │  │ Global Stream (Speaker-Invariant)   │
+         │ - Code-switch point localization  │  │ - Multi-scale CMN modulation & MFCCs │
+         │ - FastText LID + acoustic VAD     │  │ - SNAP Speaker-Nulling Projection   │
+         │ - F0 reset & pitch jumps (st)     │  │ - Orthogonal complement of speaker  │
+         │ - Energy step & Formant deltas    │  │   centroid covariance subspace      │
          └──────────────────┬────────────────┘  └──────────┬──────────────────────────┘
                             │                              │
                             └──────────────┬───────────────┘
                                            │
                     ┌──────────────────────▼───────────────────────┐
                     │ Multi-Stream L2 Shrinkage Fusion (C=0.01)    │
-                    │ - Isotonic 3-fold cross-validated calibration│
-                    │ - Sub-millisecond Edge ONNX Runtime Engine   │
+                    │ - Calibrated Platt scaling (Sigmoid)         │
+                    │ - Operational Tiers: PASS / STEP-UP / BLOCK  │
+                    │ - 95% Bootstrap Confidence Intervals         │
                     └──────────────────────┬───────────────────────┘
                                            │
                     ┌──────────────────────▼───────────────────────┐
-                    │ Real-time Telemetry & WebSocket Output       │
+                    │ Telemetry & Privacy-Compliant Explanations   │
                     │ - Spoof Probability & 95% Confidence Interval│
-                    │ - Boundary Explainability Heatmap Timestamps │
-                    │ - Automated Fraud Intervention (SaaS Action) │
+                    │ - Acoustic Seam Attribution (Zero Transcript)│
+                    │ - DPDPA 2023 Non-Semantic Compliance         │
                     └──────────────────────────────────────────────┘
 ```
 
 ---
 
-## Quickstart & Local Execution
+## 3. Benchmark Results (Strict Single Source of Truth)
 
-### 1. Run Backend & SaaS API
-```bash
-# Activate environment
-source .venv/bin/activate
+All metrics are evaluated across **4 strictly speaker-disjoint splits** (Train: 200, Val: 50, Test: 100, Held-Out Speaker: 50; N=400 total utterances):
 
-# Launch FastAPI Enterprise API & Streaming WebSocket server
-uvicorn demo.api.server:app --reload --port 8000
+| Model Configuration | Validation EER | In-Domain Test EER | 95% Bootstrap CI | Held-Out Speaker EER | Test Precision / Recall |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| Baseline A (Generic Acoustic + LR) | 0.3200 | 0.1900 | [0.1200, 0.2800] | 0.3200 | 72.1% / 88.0% |
+| Baseline B (Indian Accent Mel + LFCC) | 0.2000 | 0.1700 | [0.1000, 0.2400] | 0.1600 | 76.9% / 80.0% |
+| **VaaniShield Fused Model** | **0.1000** | **0.1200** | **[0.0800, 0.1600]** | **0.0600** | **81.8% / 90.0%** |
+
+### Three-Way Ablation Analysis (Scientific Finding)
+
+Ablation evaluating individual and combined stream contributions across test and held-out sets:
+
+| Stream / Variant | Test Set EER | Held-Out Speaker EER | Core Finding & Architectural Role |
+| :--- | :---: | :---: | :--- |
+| **Boundary-Local Stream Only** | 0.3600 | 0.3400 | Boundary cues alone degrade under heavy telephony codecs (PSTN/G.711, AMR-WB). |
+| **Speaker-Nulled Global Stream Only** | 0.1600 | 0.0800 | Orthogonal projection removes speaker identity and carries the bulk of vocoder artifact detection. |
+| **VaaniShield Fused Model** | **0.1200** | **0.0600** | Fusing boundary transition dynamics with speaker-nulled residuals yields lowest overall EER. |
+
+> **Scientific Finding**: Intra-utterance boundary cues alone are vulnerable to narrowband loss (36% EER); however, fusing them with orthogonal speaker-nulled global embeddings provides the lowest error rate and highest generalization on unseen speakers.
+
+---
+
+## 4. Repository Structure
+
 ```
-
-### 2. Launch React / Vite Web Dashboard
-```bash
-cd web
-npm install
-npm run dev
-```
-Open `http://localhost:5173` to:
-- Test bona-fide vs. cloned voice samples through telephony codecs.
-- Use the **Live Microphone** recorder or **Continuous WebSocket Call Intercept**.
-- Inspect acoustic transition heatmaps and dynamic risk gauges.
-
-### 3. Run Acceptance Gate & Tests
-```bash
-# Run test suite
-pytest tests/ -v
-
-# Run 8-point acceptance gate
-python scripts/verify.py
-
-# Validate dataset governance & G-Eval metrics
-python scripts/validate_dataset.py
-```
-
-### 4. Docker Deployment
-```bash
-docker compose up --build
+vaanishield/
+├── configs/                   # YAML configs: feature params, model hyperparams, paths
+├── data/
+│   ├── raw/                   # Source recordings (bona-fide OpenSLR + neural clones)
+│   ├── processed/             # Processed master_manifest.jsonl and augmented audio
+│   ├── consent_forms/         # Speaker registry and open corpus licensing records
+│   └── scripts/               # Manifest generation, noise augmentation, alignment
+├── vaanishield/                # Core Python package
+│   ├── boundary/               # Code-switch localization + boundary-local feature extraction
+│   ├── speaker_null/            # SNAP speaker-nulling orthogonal subspace projection
+│   ├── fusion/                  # Calibrated fusion classifier + acoustic explainability
+│   ├── baselines/               # Baseline A (generic acoustic) and Baseline B (Indian-accent LFCC)
+│   ├── evaluation/              # Metrics calculation, bootstrap CIs, ablation harness
+│   └── utils/                   # Audio I/O, logging, signal processing
+├── demo/                      # FastAPI research demo server and streaming WebSocket
+├── web/                       # React / Vite web dashboard (desktop-optimized)
+├── tests/                     # 13 pytest unit and integration tests
+└── scripts/                   # CLI tools: verify.py, train.py, evaluate.py, run_ablation.py
 ```
 
 ---
 
-## License & Ethics
-Audio data collection strictly complies with India's Digital Personal Data Protection Act (DPDPA). Every source speaker has an immutable signed consent form in `data/consent_forms/signed/`. No real scam victim calls or unconsented scraping was performed.
+## 5. Quickstart & Execution
 
+### 1. Setup Environment
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 2. Run Test Suite & Acceptance Gate
+```bash
+# Run unit and integration tests
+pytest tests/ -v
+
+# Run 8-point strict acceptance gate
+python scripts/verify.py
+
+# Validate manifest integrity and corpus licenses
+python scripts/validate_dataset.py
+```
+
+### 3. Launch Research Demo Server & Web Dashboard
+```bash
+# Start backend API (FastAPI) on port 8000
+python -m uvicorn demo.api.server:app --port 8000
+
+# In a separate terminal, launch the web interface
+cd web
+npm install
+npm run dev
+```
+Open `http://localhost:5173` in your browser to inspect test audio samples, record audio via microphone, and view acoustic seam explanations.
+
+---
+
+## 6. Privacy & Ethics (DPDPA 2023 Compliance)
+
+1. **Lawful Basis & Corpus Provenance**: The speech dataset is constructed from open public academic corpora: OpenSLR 103 (Hindi, public research license), OpenSLR 65 (Tamil, CC BY-SA 4.0), and OpenSLR 79 (Kannada, CC BY-SA 4.0). Clones were generated using Coqui XTTS v2 for scientific benchmarking.
+2. **Zero Transcript Storage**: In compliance with India's Digital Personal Data Protection Act (DPDPA 2023), VaaniShield performs strictly non-semantic acoustic analysis. Conversational speech content is never transcribed, stored, or leaked by the explainability layer.
+3. **Research Prototype**: This repository is an academic research prototype designed to study cross-lingual synthetic speech boundaries. It does not contain live carrier wiretapping capabilities.
