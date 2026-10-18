@@ -163,7 +163,7 @@ async def analyze_audio(
             audio_source = SAMPLE_MAP.get(sample_id)
             if not audio_source or not os.path.exists(audio_source):
                 raise HTTPException(status_code=404, detail=f"Preset sample not found: {sample_id}")
-            target_transcript = transcript or SAMPLE_TRANSCRIPT_MAP.get(sample_id, "")
+            target_transcript = transcript if transcript is not None else SAMPLE_TRANSCRIPT_MAP.get(sample_id, "")
             lang_pair = SAMPLE_LANG_MAP.get(sample_id, "hi-en")
         else:
             raise HTTPException(status_code=400, detail="Either 'file' or 'sample_id' must be provided.")
@@ -172,37 +172,36 @@ async def analyze_audio(
         audio_data, sr = load_audio(audio_source)
         duration_sec = len(audio_data) / sr
 
-        # 1. Automatic Speech Recognition fallback if no transcript provided
-        transcription_method = "user_provided"
-        effective_transcript = target_transcript
-        if not effective_transcript:
-            asr = get_whisper()
-            if asr:
-                try:
-                    res = asr.transcribe(audio_source, task="transcribe")
-                    effective_transcript = res.get("text", "").strip()
-                    transcription_method = "whisper_base_multilingual"
-                except Exception as e:
-                    print(f"ASR error: {e}")
-                    effective_transcript = "Mera account verify kijiye please"
-                    transcription_method = "fallback_mock"
-            else:
-                effective_transcript = "Mera account verify kijiye please"
-                transcription_method = "fallback_mock"
+        # 1. Boundary & Acoustic Seam Localization
+        # If user/preset provided transcript with code switching, localize linguistic boundaries.
+        # Otherwise, directly extract acoustic transition seams via spectral flux without Whisper latency.
+        points = []
+        localization_method = "acoustic_flux_changepoints"
+        if target_transcript and len(target_transcript.strip().split()) >= 2:
+            tokens = target_transcript.strip().split()
+            points = find_codeswitch_points(
+                audio_path=audio_source,
+                transcript_tokens=tokens,
+                lid_model="fasttext-lid176",
+                alignment_backend="whisper",
+                window_ms_before=300,
+                window_ms_after=300,
+            )
+            if points:
+                localization_method = "transcript_codeswitch_alignment"
 
-        tokens = effective_transcript.split()
+        # Fallback to acoustic change points if no transcript or no linguistic boundaries found
+        if not points:
+            from vaanishield.boundary.localization import find_acoustic_change_points
+            points = find_acoustic_change_points(
+                audio_path=audio_source,
+                window_ms_before=300,
+                window_ms_after=300,
+                max_points=5,
+            )
+            localization_method = "acoustic_flux_changepoints"
 
-        # 2. Localize code-switch points
-        points = find_codeswitch_points(
-            audio_path=audio_source,
-            transcript_tokens=tokens,
-            lid_model="fasttext-lid176",
-            alignment_backend="whisper",
-            window_ms_before=300,
-            window_ms_after=300,
-        )
-
-        # 3. Boundary-local features
+        # 2. Boundary-local features
         b_feats = extract_boundary_features(audio_source, points)
         agg_vec = aggregate_boundary_features(b_feats, aggregation="mean_and_max")
 
@@ -268,6 +267,7 @@ async def analyze_audio(
                 "duration_sec": round(duration_sec, 2),
                 "sample_rate_hz": sr,
                 "detected_boundary_count": len(points),
+                "localization_method": localization_method,
                 "language_pair": lang_pair,
                 "waveform_peaks": waveform_peaks,
             },

@@ -160,7 +160,7 @@ export default function App() {
         animationFrameRef.current = requestAnimationFrame(draw);
         analyser.getByteTimeDomainData(dataArray);
 
-        canvasCtx.fillStyle = "#090c10";
+        canvasCtx.fillStyle = "#06080b";
         canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
         canvasCtx.lineWidth = 2;
         canvasCtx.strokeStyle = "#10b981";
@@ -339,6 +339,10 @@ export default function App() {
             <span className="brand-icon">🛡️</span>
             <span>VaaniShield</span>
           </a>
+          <span className="brand-pill-badge">
+            <span className="pulse-dot"></span>
+            ACTIVE FORENSIC ENGINE
+          </span>
         </div>
 
         <nav className="nav-links">
@@ -366,9 +370,6 @@ export default function App() {
         </nav>
 
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <span className="brand-badge" style={{ color: "#10b981", borderColor: "rgba(16, 185, 129, 0.3)" }}>
-            ENGINE ACTIVE
-          </span>
           <button
             type="button"
             className="mobile-menu-btn"
@@ -391,29 +392,42 @@ export default function App() {
           {/* Left Column: Audio Controls & Presets */}
           <section className="dashboard-col left-col">
             <div className="control-card">
-              <h3 style={{ fontSize: "14px", fontWeight: 700, marginBottom: "8px" }}>
-                1. Test Audio Sample
-              </h3>
+              <div className="card-heading-row">
+                <div className="card-heading">
+                  <span className="step-tag">01</span>
+                  <span>Select Voice Recording</span>
+                </div>
+                <span className="mono-text" style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                  8 kHz PSTN / HD
+                </span>
+              </div>
 
               <div className="sample-grid">
                 {presets.map((p) => {
                   const isSel = selectedSample === p.id && !uploadedFile;
+                  const isHuman = p.category === "human";
                   return (
                     <button
                       key={p.id}
                       type="button"
-                      className={`sample-btn ${isSel ? "active" : ""}`}
+                      className={`sample-btn ${isHuman ? "human-sample" : "clone-sample"} ${isSel ? "active" : ""}`}
                       onClick={() => selectPreset(p)}
                     >
+                      <div className="sample-tag-row">
+                        <span className={isHuman ? "sample-tag-human" : "sample-tag-clone"}>
+                          {isHuman ? "Authentic" : "Synthesized"}
+                        </span>
+                        <span className="sample-lang-tag">{p.lang}</span>
+                      </div>
                       <div className="sample-title">{p.title}</div>
-                      <div className="sample-sub">{p.speaker} &bull; {p.lang}</div>
+                      <div className="sample-sub">{p.speaker}</div>
                     </button>
                   );
                 })}
               </div>
 
               {/* Upload & Mic Actions */}
-              <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+              <div style={{ display: "flex", gap: "10px", marginTop: "14px" }}>
                 <input
                   type="file"
                   accept=".wav"
@@ -424,75 +438,82 @@ export default function App() {
                 <button
                   type="button"
                   className="btn-secondary"
-                  style={{ flex: 1, padding: "8px" }}
+                  style={{ flex: 1 }}
                   onClick={() => fileInputRef.current.click()}
                 >
-                  📁 Upload .WAV
+                  📁 Upload .WAV Audio
                 </button>
 
                 {!isRecording ? (
                   <button
                     type="button"
                     className="btn-secondary"
-                    style={{ flex: 1, padding: "8px", borderColor: "#ef4444", color: "#ef4444" }}
+                    style={{ flex: 1, borderColor: "var(--crimson-border)", color: "var(--crimson-text)" }}
                     onClick={startRecording}
                   >
-                    🎙️ Record Mic
+                    🎙️ Record Live Voice
                   </button>
                 ) : (
                   <button
                     type="button"
                     className="btn-secondary"
-                    style={{ flex: 1, padding: "8px", background: "rgba(239, 68, 68, 0.2)", color: "#fca5a5" }}
+                    style={{ flex: 1, background: "var(--crimson-glow)", color: "var(--crimson-text)", borderColor: "var(--crimson-border)" }}
                     onClick={stopRecording}
                   >
-                    ⏹️ Stop ({recordingDuration}s)
+                    ⏹️ Stop Recording ({recordingDuration}s)
                   </button>
                 )}
               </div>
 
               {/* Live Canvas for mic */}
               {isRecording && (
-                <div style={{ marginTop: "8px", borderRadius: "6px", overflow: "hidden", border: "1px solid #334155" }}>
-                  <canvas ref={canvasRef} width={380} height={40} style={{ display: "block", width: "100%" }} />
+                <div style={{ marginTop: "10px", borderRadius: "8px", overflow: "hidden", border: "1px solid var(--border-medium)" }}>
+                  <canvas ref={canvasRef} width={420} height={48} style={{ display: "block", width: "100%" }} />
                 </div>
               )}
 
               {/* Audio Player */}
               {audioUrl && (
-                <div style={{ marginTop: "12px", background: "#090c10", padding: "8px", borderRadius: "6px" }}>
-                  <audio
-                    src={audioUrl}
-                    controls
-                    style={{ width: "100%", height: "32px", display: "block" }}
-                  />
+                <div className="audio-player-wrapper">
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--text-muted)" }}>
+                    <span style={{ fontWeight: 600 }}>MONITORED AUDIO CHANNEL</span>
+                    <span className="mono-text">PCM 16-BIT</span>
+                  </div>
+                  <audio src={audioUrl} controls />
                 </div>
               )}
 
               {/* Transcript context (optional) */}
-              <div style={{ marginTop: "10px" }}>
-                <label style={{ fontSize: "11px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
-                  TRANSCRIPT CONTEXT (FOR CODE-SWITCH BOUNDARY ALIGNMENT)
-                </label>
+              <div style={{ marginTop: "14px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                  <label style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-muted)", letterSpacing: "0.05em" }}>
+                    TRANSCRIPT CONTEXT (CODE-SWITCH ALIGNMENT)
+                  </label>
+                  <span style={{ fontSize: "10px", color: "var(--text-dim)" }}>Automatic LID enabled</span>
+                </div>
                 <input
                   type="text"
                   value={transcript}
                   onChange={(e) => setTranscript(e.target.value)}
-                  placeholder="e.g. Mera laptop start nahi ho raha..."
+                  placeholder="e.g. Mera laptop start nahi ho raha, can you check the battery?"
                   style={{
                     width: "100%",
-                    padding: "8px 10px",
-                    background: "#090c10",
-                    border: "1px solid var(--border-color)",
+                    padding: "10px 14px",
+                    background: "var(--bg-input)",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: "8px",
                     color: "var(--text-primary)",
+                    fontSize: "13px",
+                    fontFamily: "inherit",
+                    outline: "none",
                   }}
                 />
               </div>
 
               {/* Error & Success Messages */}
-              {formError && <div className="banner error-banner">{formError}</div>}
-              {apiError && <div className="banner error-banner">{apiError}</div>}
-              {successMsg && <div className="banner success-banner">{successMsg}</div>}
+              {formError && <div className="banner error-banner">⚠️ {formError}</div>}
+              {apiError && <div className="banner error-banner">⚠️ {apiError}</div>}
+              {successMsg && <div className="banner success-banner">✓ {successMsg}</div>}
 
               {/* Execute Scan Button */}
               <button
@@ -500,9 +521,19 @@ export default function App() {
                 className="btn-scan"
                 disabled={isLoading}
                 onClick={runAnalysis}
-                style={{ width: "100%", marginTop: "12px" }}
+                style={{ width: "100%", marginTop: "16px" }}
               >
-                {isLoading ? "EXTRACTING DUAL-STREAM ACOUSTIC RESIDUALS..." : "🔍 VERIFY VOICE AUTHENTICITY"}
+                {isLoading ? (
+                  <>
+                    <span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⚙️</span>
+                    <span>EXTRACTING DUAL-STREAM ACOUSTIC RESIDUALS...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🔍</span>
+                    <span>VERIFY VOICE AUTHENTICITY</span>
+                  </>
+                )}
               </button>
             </div>
           </section>
@@ -513,22 +544,32 @@ export default function App() {
               <div
                 className="control-card"
                 style={{
-                  height: "100%",
+                  minHeight: "440px",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center",
                   textAlign: "center",
-                  color: "var(--text-muted)",
+                  padding: "40px 24px",
                 }}
               >
-                <div style={{ fontSize: "36px", marginBottom: "8px" }}>🛡️</div>
-                <h3 style={{ color: "var(--text-primary)", marginBottom: "4px" }}>
-                  Ready to Inspect Voice Clip
+                <div style={{ fontSize: "44px", marginBottom: "16px", filter: "drop-shadow(0 0 12px rgba(59, 130, 246, 0.4))" }}>
+                  🛡️
+                </div>
+                <h3 style={{ fontSize: "18px", fontWeight: 800, color: "var(--text-white)", marginBottom: "8px" }}>
+                  Acoustic Forensic Engine Ready
                 </h3>
-                <p style={{ maxWidth: "340px", fontSize: "12px", lineHeight: "1.5" }}>
-                  Select one of the 6 test audio samples on the left or record audio. Click <strong>Verify Voice Authenticity</strong> to inspect boundary phase discontinuities and speaker-nulled residuals.
+                <p style={{ maxWidth: "420px", fontSize: "13px", color: "var(--text-secondary)", lineHeight: "1.6" }}>
+                  Select an authentic speaker or AI synthesized clone on the left. Click <strong>Verify Voice Authenticity</strong> to isolate intra-sentence code-switch boundary seams and speaker-orthogonal synthesis residuals.
                 </p>
+                <div style={{ marginTop: "20px", display: "flex", gap: "8px" }}>
+                  <span className="brand-pill-badge" style={{ background: "rgba(59, 130, 246, 0.1)", borderColor: "rgba(59, 130, 246, 0.3)", color: "#93c5fd" }}>
+                    ✓ Anti-Memorization Nulling (SNAP)
+                  </span>
+                  <span className="brand-pill-badge" style={{ background: "rgba(16, 185, 129, 0.1)", borderColor: "rgba(16, 185, 129, 0.3)", color: "#86efac" }}>
+                    ✓ DPDPA Non-Semantic Privacy
+                  </span>
+                </div>
               </div>
             )}
 
@@ -536,26 +577,27 @@ export default function App() {
               <div
                 className="control-card"
                 style={{
-                  height: "100%",
+                  minHeight: "440px",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center",
                   textAlign: "center",
+                  padding: "40px 24px",
                 }}
               >
-                <div style={{ fontSize: "28px", animation: "spin 1.5s linear infinite" }}>⚙️</div>
-                <h3 style={{ marginTop: "12px", color: "var(--text-primary)" }}>
-                  Analyzing Acoustic Micro-Seams...
+                <div style={{ fontSize: "36px", animation: "spin 1.2s linear infinite", marginBottom: "16px" }}>⚙️</div>
+                <h3 style={{ fontSize: "18px", fontWeight: 800, color: "var(--text-white)", marginBottom: "8px" }}>
+                  Scanning Micro-Seams & Nulling Identity...
                 </h3>
-                <p style={{ color: "var(--text-muted)", fontSize: "12px", marginTop: "4px" }}>
-                  Checking pitch jumps (F0), formant trajectories, and SNAP orthogonal subspace.
+                <p style={{ color: "var(--text-muted)", fontSize: "13px", maxWidth: "380px", lineHeight: "1.5" }}>
+                  Aligning boundary phoneme windows (±300ms), computing F0 reset differentials, and projecting against the speaker manifold.
                 </p>
               </div>
             )}
 
             {analysisResult && (
-              <div className="control-card" style={{ height: "100%", overflowY: "auto" }}>
+              <div className="control-card">
                 {/* Big Result Badge */}
                 <div
                   className={`verdict-box ${
@@ -569,82 +611,93 @@ export default function App() {
                   <div className="verdict-icon">
                     {analysisResult.is_spoof ? "🚨" : analysisResult.operational_decision?.risk_tier === "ELEVATED" ? "⚠️" : "✅"}
                   </div>
-                  <div>
-                    <div className="verdict-title">
-                      {analysisResult.is_spoof
-                        ? "SYNTHETIC AI VOICE CLONE"
-                        : analysisResult.operational_decision?.risk_tier === "ELEVATED"
-                        ? "UNCERTAIN / STEP-UP VERIFICATION"
-                        : "AUTHENTIC HUMAN VOICE"}
+                  <div className="verdict-content">
+                    <div className="verdict-header-row">
+                      <div className="verdict-title">
+                        {analysisResult.is_spoof
+                          ? "SYNTHETIC AI VOICE CLONE"
+                          : analysisResult.operational_decision?.risk_tier === "ELEVATED"
+                          ? "UNCERTAIN / STEP-UP VERIFICATION"
+                          : "AUTHENTIC HUMAN VOICE"}
+                      </div>
+                      <span
+                        className="mono-text"
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          padding: "2px 8px",
+                          borderRadius: "4px",
+                          background: analysisResult.is_spoof ? "rgba(239, 68, 68, 0.3)" : "rgba(16, 185, 129, 0.3)",
+                          color: analysisResult.is_spoof ? "#fca5a5" : "#86efac",
+                          border: analysisResult.is_spoof ? "1px solid rgba(239, 68, 68, 0.5)" : "1px solid rgba(16, 185, 129, 0.5)",
+                        }}
+                      >
+                        {analysisResult.operational_decision?.recommended_action || "POLICY PASS"}
+                      </span>
                     </div>
                     <div className="verdict-desc">
                       {analysisResult.is_spoof
-                        ? "Acoustic seam discontinuities and neural vocoder spectral artifacts detected."
+                        ? "Acoustic seam discontinuities and neural vocoder spectral artifacts detected across language switch points."
                         : analysisResult.operational_decision?.risk_tier === "ELEVATED"
-                        ? "Marginal acoustic confidence under channel noise; step-up biometric prompt suggested."
-                        : "Continuous natural vocal tract dynamics and zero neural synthesis seams."}
+                        ? "Marginal acoustic confidence under channel noise; step-up biometric prompt recommended."
+                        : "Continuous natural vocal tract dynamics and zero neural synthesis seams detected."}
                     </div>
                   </div>
                 </div>
 
-                {/* Metrics Bar */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", margin: "12px 0" }}>
+                {/* Metrics 3-Col Bar */}
+                <div className="metrics-grid-3">
                   <div className="risk-meter-box">
-                    <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>SPOOF PROBABILITY</div>
+                    <div className="metric-label">Spoof Probability</div>
                     <div
+                      className="metric-val-huge"
                       style={{
-                        fontSize: "20px",
-                        fontWeight: 800,
-                        color: analysisResult.is_spoof ? "#f87171" : "#4ade80",
+                        color: analysisResult.is_spoof ? "var(--crimson-pure)" : "var(--emerald-pure)",
                       }}
                     >
                       {(analysisResult.spoof_probability * 100).toFixed(1)}%
                     </div>
-                  </div>
-
-                  <div className="risk-meter-box">
-                    <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>95% BOOTSTRAP CI</div>
-                    <div className="mono-text" style={{ fontSize: "12px", marginTop: "4px" }}>
-                      [{(analysisResult.confidence_interval_95[0] * 100).toFixed(1)}%, {(analysisResult.confidence_interval_95[1] * 100).toFixed(1)}%]
+                    <div className="metric-sub">
+                      Threshold &tau; = 50.0%
                     </div>
                   </div>
 
                   <div className="risk-meter-box">
-                    <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>POLICY TIER</div>
-                    <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-primary)", marginTop: "4px" }}>
-                      {analysisResult.operational_decision?.decision || "PASS"}
+                    <div className="metric-label">95% Bootstrap CI</div>
+                    <div className="metric-val-huge mono-text" style={{ fontSize: "18px", color: "var(--text-white)" }}>
+                      [{(analysisResult.confidence_interval_95[0] * 100).toFixed(1)}%, {(analysisResult.confidence_interval_95[1] * 100).toFixed(1)}%]
+                    </div>
+                    <div className="metric-sub">
+                      100-fold clustered resample
+                    </div>
+                  </div>
+
+                  <div className="risk-meter-box">
+                    <div className="metric-label">Operational Policy</div>
+                    <div className="metric-val-huge" style={{ fontSize: "16px", color: "var(--text-white)" }}>
+                      {analysisResult.operational_decision?.decision || "ALLOW"}
+                    </div>
+                    <div className="metric-sub">
+                      Tier: {analysisResult.operational_decision?.risk_tier || "SECURE"}
                     </div>
                   </div>
                 </div>
 
                 {/* Waveform & Boundary Markers */}
-                <div style={{ margin: "12px 0" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--text-muted)", marginBottom: "4px" }}>
-                    <span>ACOUSTIC ENERGY & BOUNDARY WINDOW LOCATIONS</span>
-                    <span>{analysisResult.audio_metadata?.duration_sec}s duration</span>
+                <div className="waveform-container">
+                  <div className="waveform-header">
+                    <span>Acoustic Energy & Code-Switch Seam Localization</span>
+                    <span className="mono-text">{analysisResult.audio_metadata?.duration_sec}s &bull; {analysisResult.audio_metadata?.detected_boundary_count || 0} boundaries</span>
                   </div>
-                  <div
-                    style={{
-                      height: "44px",
-                      background: "#090c10",
-                      borderRadius: "6px",
-                      position: "relative",
-                      display: "flex",
-                      alignItems: "center",
-                      padding: "0 6px",
-                      gap: "2px",
-                      border: "1px solid var(--border-color)",
-                    }}
-                  >
+                  <div className="waveform-track">
                     {(analysisResult.audio_metadata?.waveform_peaks || []).map((val, idx) => (
                       <div
                         key={idx}
+                        className="waveform-bar"
                         style={{
-                          flex: 1,
-                          height: `${Math.max(4, Math.min(38, val * 38))}px`,
-                          background: analysisResult.is_spoof ? "#ef4444" : "#10b981",
-                          opacity: 0.75,
-                          borderRadius: "1px",
+                          height: `${Math.max(6, Math.min(48, val * 48))}px`,
+                          background: analysisResult.is_spoof ? "var(--crimson-pure)" : "var(--emerald-pure)",
+                          opacity: 0.8,
                         }}
                       />
                     ))}
@@ -652,21 +705,13 @@ export default function App() {
                     {/* Boundary Marker Lines */}
                     {(analysisResult.explanations || []).map((exp, eIdx) => {
                       const dur = analysisResult.audio_metadata?.duration_sec || 5.0;
-                      const pct = Math.min(98, Math.max(2, (exp.timestamp_sec / dur) * 100));
+                      const pct = Math.min(97, Math.max(3, (exp.timestamp_sec / dur) * 100));
                       return (
                         <div
                           key={eIdx}
-                          title={`Boundary #${exp.boundary_index}: ${exp.language_transition} at ${exp.timestamp_sec}s`}
-                          style={{
-                            position: "absolute",
-                            left: `${pct}%`,
-                            top: 0,
-                            bottom: 0,
-                            width: "2px",
-                            background: "#f59e0b",
-                            boxShadow: "0 0 6px #f59e0b",
-                            zIndex: 10,
-                          }}
+                          className="seam-marker-line"
+                          title={`Boundary #${exp.boundary_index}: ${exp.language_transition} at ${exp.timestamp_sec}s (${(exp.contribution_score * 100).toFixed(0)}% seam anomaly)`}
+                          style={{ left: `${pct}%` }}
                         />
                       );
                     })}
@@ -674,53 +719,39 @@ export default function App() {
                 </div>
 
                 {/* Acoustic Explanations List (Zero Transcript Content) */}
-                <div style={{ marginTop: "12px" }}>
-                  <div style={{ fontSize: "12px", fontWeight: 700, marginBottom: "6px", display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span>🔬 Acoustic Seam Attributions</span>
-                    <span style={{ fontSize: "10px", color: "var(--text-muted)", fontWeight: 400 }}>
-                      (Zero transcript content stored / DPDPA compliant)
+                <div style={{ marginTop: "16px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-white)", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span>🔬 Forensic Micro-Seam Attributions</span>
+                    </div>
+                    <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                      Zero Spoken Content Stored (DPDPA 2023)
                     </span>
                   </div>
 
                   {(!analysisResult.explanations || analysisResult.explanations.length === 0) ? (
-                    <div style={{ fontSize: "12px", color: "var(--text-muted)", padding: "8px", background: "#090c10", borderRadius: "6px" }}>
+                    <div style={{ fontSize: "13px", color: "var(--text-muted)", padding: "14px", background: "var(--bg-surface)", borderRadius: "8px", border: "1px solid var(--border-subtle)" }}>
                       Monolingual or continuous vocal tract contour — no cross-lingual boundary seam detected.
                     </div>
                   ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <div className="seam-card-list">
                       {analysisResult.explanations.map((exp, idx) => (
-                        <div
-                          key={idx}
-                          style={{
-                            background: "#090c10",
-                            border: "1px solid var(--border-color)",
-                            borderRadius: "6px",
-                            padding: "8px 10px",
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                          }}
-                        >
+                        <div key={idx} className="seam-card-item">
                           <div>
-                            <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)" }}>
-                              Boundary #{exp.boundary_index} &bull; {exp.language_transition} @ {exp.timestamp_sec}s
+                            <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-white)", display: "flex", alignItems: "center", gap: "8px" }}>
+                              <span>Boundary #{exp.boundary_index}</span>
+                              <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>&bull;</span>
+                              <span className="mono-text" style={{ color: "var(--cyan-pure)", fontSize: "12px" }}>{exp.language_transition}</span>
+                              <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>@</span>
+                              <span className="mono-text" style={{ color: "var(--text-secondary)", fontSize: "12px" }}>{exp.timestamp_sec}s</span>
                             </div>
-                            <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>
+                            <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
                               {exp.description}
                             </div>
                           </div>
-                          <div style={{ textAlign: "right" }}>
-                            <span
-                              style={{
-                                fontSize: "11px",
-                                fontWeight: 700,
-                                padding: "2px 6px",
-                                borderRadius: "4px",
-                                background: exp.contribution_score > 0.6 ? "rgba(239, 68, 68, 0.2)" : "rgba(16, 185, 129, 0.2)",
-                                color: exp.contribution_score > 0.6 ? "#fca5a5" : "#86efac",
-                              }}
-                            >
-                              {(exp.contribution_score * 100).toFixed(0)}% Seam Anomaly
+                          <div>
+                            <span className={exp.contribution_score > 0.6 ? "seam-badge-danger" : "seam-badge-safe"}>
+                              {(exp.contribution_score * 100).toFixed(0)}% Seam Discontinuity
                             </span>
                           </div>
                         </div>
@@ -730,26 +761,27 @@ export default function App() {
                 </div>
 
                 {/* Diagnostics Toggle */}
-                <div style={{ marginTop: "12px" }}>
+                <div style={{ marginTop: "16px" }}>
                   <button
                     type="button"
                     className="btn-secondary"
-                    style={{ fontSize: "11px", padding: "4px 8px" }}
+                    style={{ fontSize: "11px", padding: "6px 12px" }}
                     onClick={() => setShowTechnicalLog(!showTechnicalLog)}
                   >
-                    {showTechnicalLog ? "Hide Diagnostic Vector" : "Show Diagnostic Vector"}
+                    {showTechnicalLog ? "Hide Diagnostic Telemetry" : "Show Diagnostic Telemetry"}
                   </button>
 
                   {showTechnicalLog && (
                     <pre
                       className="mono-text"
                       style={{
-                        marginTop: "8px",
-                        padding: "8px",
-                        background: "#050709",
-                        borderRadius: "6px",
+                        marginTop: "10px",
+                        padding: "12px",
+                        background: "var(--bg-base)",
+                        border: "1px solid var(--border-subtle)",
+                        borderRadius: "8px",
                         fontSize: "11px",
-                        color: "#94a3b8",
+                        color: "var(--text-secondary)",
                         overflowX: "auto",
                       }}
                     >
@@ -775,54 +807,56 @@ export default function App() {
       {/* View 2: Pipeline Flow & Architecture */}
       {currentPage === "pipeline" && (
         <article className="page-article">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
             <div>
               <h2>VaaniShield End-to-End Pipeline Architecture</h2>
               <p>How VaaniShield tracks synthetic speech and prevents voice fraud in Indian multilingual calls.</p>
             </div>
             <button type="button" className="btn-scan" onClick={() => navigateTo("analyzer")}>
-              TRY LIVE DETECTOR
+              LAUNCH LIVE DETECTOR
             </button>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "20px" }}>
-            <div className="control-card" style={{ padding: "14px" }}>
-              <div style={{ fontSize: "20px", marginBottom: "6px" }}>📡 Step 1</div>
-              <h4 style={{ fontSize: "13px", color: "var(--text-primary)", marginBottom: "4px" }}>Audio Ingestion</h4>
-              <p style={{ fontSize: "12px", color: "var(--text-muted)", lineHeight: "1.4" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "14px", marginBottom: "24px" }}>
+            <div className="control-card">
+              <div style={{ fontSize: "24px", marginBottom: "8px" }}>📡 Step 1</div>
+              <h4 style={{ fontSize: "14px", color: "var(--text-white)", marginBottom: "6px" }}>Audio Ingestion</h4>
+              <p style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: "1.5" }}>
                 Ingests streaming 8 kHz PSTN / VoIP telephony or 16 kHz HD speech. Downsamples and strips loudness offsets.
               </p>
             </div>
 
-            <div className="control-card" style={{ padding: "14px" }}>
-              <div style={{ fontSize: "20px", marginBottom: "6px" }}>📍 Step 2</div>
-              <h4 style={{ fontSize: "13px", color: "var(--text-primary)", marginBottom: "4px" }}>Boundary Localization</h4>
-              <p style={{ fontSize: "12px", color: "var(--text-muted)", lineHeight: "1.4" }}>
-                Identifies code-switch points (e.g. Hindi &rarr; English). Extracts localized ±300ms analysis windows around transitions.
+            <div className="control-card">
+              <div style={{ fontSize: "24px", marginBottom: "8px" }}>📍 Step 2</div>
+              <h4 style={{ fontSize: "14px", color: "var(--text-white)", marginBottom: "6px" }}>Boundary Localization</h4>
+              <p style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: "1.5" }}>
+                Identifies code-switch points (e.g. Hindi &rarr; English). Extracts localized &plusmn;300ms analysis windows around transitions.
               </p>
             </div>
 
-            <div className="control-card" style={{ padding: "14px" }}>
-              <div style={{ fontSize: "20px", marginBottom: "6px" }}>🔬 Step 3</div>
-              <h4 style={{ fontSize: "13px", color: "var(--text-primary)", marginBottom: "4px" }}>Dual-Stream Extraction</h4>
-              <p style={{ fontSize: "12px", color: "var(--text-muted)", lineHeight: "1.4" }}>
+            <div className="control-card">
+              <div style={{ fontSize: "24px", marginBottom: "8px" }}>🔬 Step 3</div>
+              <h4 style={{ fontSize: "14px", color: "var(--text-white)", marginBottom: "6px" }}>Dual-Stream Extraction</h4>
+              <p style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: "1.5" }}>
                 <strong>Stream A:</strong> Boundary micro-seams (F0 reset, formant transitions).<br />
                 <strong>Stream B:</strong> SNAP speaker-nulling orthogonal projection.
               </p>
             </div>
 
-            <div className="control-card" style={{ padding: "14px" }}>
-              <div style={{ fontSize: "20px", marginBottom: "6px" }}>⚖️ Step 4</div>
-              <h4 style={{ fontSize: "13px", color: "var(--text-primary)", marginBottom: "4px" }}>Calibrated Fusion</h4>
-              <p style={{ fontSize: "12px", color: "var(--text-muted)", lineHeight: "1.4" }}>
+            <div className="control-card">
+              <div style={{ fontSize: "24px", marginBottom: "8px" }}>⚖️ Step 4</div>
+              <h4 style={{ fontSize: "14px", color: "var(--text-white)", marginBottom: "6px" }}>Calibrated Fusion</h4>
+              <p style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: "1.5" }}>
                 Calibrated logistic regression produces continuous probabilities with 95% bootstrap CIs and operational risk tiers.
               </p>
             </div>
           </div>
 
-          <div className="control-card" style={{ padding: "16px", marginBottom: "16px" }}>
-            <h3 style={{ fontSize: "14px", marginBottom: "8px" }}>Why Both Streams are Necessary: The Indian Telephony Dilemma</h3>
-            <p style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: "1.6" }}>
+          <div className="control-card" style={{ marginBottom: "20px" }}>
+            <h3 style={{ fontSize: "16px", marginBottom: "10px", color: "var(--text-white)" }}>
+              Why Both Streams are Necessary: The Indian Telephony Dilemma
+            </h3>
+            <p style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: "1.6" }}>
               1. <strong>Speaker Entanglement Problem:</strong> Standard deep learning models trained on voice samples easily memorize individual speakers or accent characteristics rather than synthesis artifacts. Our <em>Speaker-Nulling Artifact Projection (SNAP)</em> projects embeddings onto the orthogonal complement of the between-speaker subspace, stripping identity and preventing false alarms on non-standard Indian accents.<br />
               2. <strong>Intra-Utterance Boundary Seams:</strong> Voice cloning models frequently fail when transitioning between languages mid-sentence (e.g., Hinglish), leaving subtle phase resets and unnatural pitch jumps at switch points. Our boundary stream detects these localized anomalies even under compression.
             </p>
@@ -833,39 +867,39 @@ export default function App() {
       {/* View 3: Technical & Research Specs */}
       {currentPage === "specs" && (
         <article className="page-article">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
             <div>
               <h2>Scientific Evaluation & Ablation Results</h2>
               <p>Empirical metrics computed across 4 strictly speaker-disjoint splits (N=400 recordings).</p>
             </div>
             <button type="button" className="btn-scan" onClick={() => navigateTo("analyzer")}>
-              TRY LIVE DETECTOR
+              LAUNCH LIVE DETECTOR
             </button>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "20px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px", marginBottom: "24px" }}>
             <div className="risk-meter-box">
-              <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>IN-DOMAIN TEST EER</div>
-              <div style={{ fontSize: "20px", fontWeight: 800, color: "#10b981" }}>14.00%</div>
-              <div className="mono-text" style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>95% CI: [2.0%, 30.0%]</div>
+              <div className="metric-label">IN-DOMAIN TEST EER</div>
+              <div className="metric-val-huge" style={{ color: "var(--emerald-pure)" }}>14.00%</div>
+              <div className="metric-sub">95% CI: [2.0%, 30.0%]</div>
             </div>
             <div className="risk-meter-box">
-              <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>HELDOUT SYNTHESIZER EER</div>
-              <div style={{ fontSize: "20px", fontWeight: 800, color: "#f59e0b" }}>74.00%</div>
-              <div className="mono-text" style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>Microsoft Edge Neural Voice</div>
+              <div className="metric-label">HELDOUT SYNTHESIZER EER</div>
+              <div className="metric-val-huge" style={{ color: "var(--amber-pure)" }}>74.00%</div>
+              <div className="metric-sub">Microsoft Edge Neural Voice</div>
             </div>
             <div className="risk-meter-box">
-              <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>VALIDATION EER</div>
-              <div style={{ fontSize: "20px", fontWeight: 800, color: "#38bdf8" }}>0.00%</div>
-              <div className="mono-text" style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>95% CI: [0.0%, 0.0%]</div>
+              <div className="metric-label">VALIDATION EER</div>
+              <div className="metric-val-huge" style={{ color: "var(--cyan-pure)" }}>0.00%</div>
+              <div className="metric-sub">95% CI: [0.0%, 0.0%]</div>
             </div>
           </div>
 
           <h3>1. Model Comparison across Splits (N=400)</h3>
-          <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "8px" }}>
+          <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "12px" }}>
             Zero speaker or utterance overlap across splits. Verified generalization without speaker memorization:
           </p>
-          <div className="table-wrapper" style={{ marginBottom: "20px" }}>
+          <div className="table-wrapper" style={{ marginBottom: "24px" }}>
             <table className="raw-table">
               <thead>
                 <tr>
@@ -891,22 +925,22 @@ export default function App() {
                   <td>14.0%</td>
                   <td>56.9% / 66.0%</td>
                 </tr>
-                <tr style={{ background: "rgba(16, 185, 129, 0.1)" }}>
-                  <td><strong>VaaniShield Full Fused Model</strong></td>
-                  <td style={{ color: "#10b981", fontWeight: 700 }}>0.0%</td>
-                  <td style={{ color: "#10b981", fontWeight: 700 }}>14.0%</td>
-                  <td style={{ color: "#f59e0b", fontWeight: 700 }}>74.0%</td>
-                  <td style={{ color: "#10b981", fontWeight: 700 }}>88.4% / 76.0%</td>
+                <tr style={{ background: "rgba(16, 185, 129, 0.08)" }}>
+                  <td><strong style={{ color: "var(--text-white)" }}>VaaniShield Full Fused Model</strong></td>
+                  <td style={{ color: "var(--emerald-text)", fontWeight: 700 }}>0.0%</td>
+                  <td style={{ color: "var(--emerald-text)", fontWeight: 700 }}>14.0%</td>
+                  <td style={{ color: "var(--amber-text)", fontWeight: 700 }}>74.0%</td>
+                  <td style={{ color: "var(--emerald-text)", fontWeight: 700 }}>88.4% / 76.0%</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
           <h3>2. Three-Way Ablation Analysis (Anti-Shortcut Verified)</h3>
-          <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "8px" }}>
+          <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "12px" }}>
             Evaluating individual and combined stream contributions across test and held-out sets:
           </p>
-          <div className="table-wrapper" style={{ marginBottom: "20px" }}>
+          <div className="table-wrapper" style={{ marginBottom: "24px" }}>
             <table className="raw-table">
               <thead>
                 <tr>
@@ -929,10 +963,10 @@ export default function App() {
                   <td>66.0%</td>
                   <td>Orthogonal projection captures XTTS training vocoder signatures, but exhibits domain shift on unseen commercial neural TTS engines.</td>
                 </tr>
-                <tr style={{ background: "rgba(16, 185, 129, 0.1)" }}>
-                  <td><strong>VaaniShield Full Fused Model</strong></td>
-                  <td style={{ color: "#10b981", fontWeight: 700 }}>14.0%</td>
-                  <td style={{ color: "#f59e0b", fontWeight: 700 }}>74.0%</td>
+                <tr style={{ background: "rgba(16, 185, 129, 0.08)" }}>
+                  <td><strong style={{ color: "var(--text-white)" }}>VaaniShield Full Fused Model</strong></td>
+                  <td style={{ color: "var(--emerald-text)", fontWeight: 700 }}>14.0%</td>
+                  <td style={{ color: "var(--amber-text)", fontWeight: 700 }}>74.0%</td>
                   <td>Fusing boundary transition dynamics with speaker-nulled residuals yields lowest in-domain error rate (14.0% vs 39.0%/48.0% baselines).</td>
                 </tr>
               </tbody>
@@ -940,7 +974,7 @@ export default function App() {
           </div>
 
           <h3>3. Zero Transcript Storage & DPDPA 2023 Compliance</h3>
-          <p style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: "1.6" }}>
+          <p style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: "1.6" }}>
             In compliance with India's Digital Personal Data Protection Act (DPDPA 2023), VaaniShield performs strictly non-semantic acoustic analysis. Audio is evaluated strictly for physical vocal tract and vocoder anomalies; speech content is never recorded, transcribed, or stored in persistent databases.
           </p>
         </article>
@@ -949,7 +983,7 @@ export default function App() {
       {/* Footer */}
       <footer className="site-footer">
         <div>
-          &copy; 2026 VaaniShield Research &bull; IIT Delhi Research Park
+          &copy; 2026 VaaniShield Security Intelligence &bull; IIT Delhi Research Park
         </div>
         <div>
           Privacy-Preserving Acoustic Voice Clone Detection &bull; Zero Transcript Storage

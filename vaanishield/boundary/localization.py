@@ -229,6 +229,93 @@ def align_tokens_to_audio(
     return aligned
 
 
+def find_acoustic_change_points(
+    audio_path: str,
+    window_ms_before: int = 300,
+    window_ms_after: int = 300,
+    max_points: int = 5,
+) -> List[CodeSwitchPoint]:
+    """Detect unsupervised acoustic change points directly from raw waveform.
+
+    Computes spectral flux (frame-to-frame MFCC delta norm) and energy onset
+    peaks, isolating natural phonetic and vocal tract transition seams without
+    requiring ASR transcripts or language models.
+    """
+    import librosa
+
+    audio, sr = load_audio(audio_path)
+    total_duration = len(audio) / sr
+    if total_duration < 0.4:
+        return []
+
+    hop_length = max(16, int(0.010 * sr))  # 10ms hop
+    n_fft = min(512, len(audio))
+
+    # Compute MFCCs and delta spectral flux
+    mfcc = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=13, n_fft=n_fft, hop_length=hop_length)
+    delta_mfcc = librosa.feature.delta(mfcc)
+    flux = np.linalg.norm(delta_mfcc, axis=0)
+
+    # Standardize flux
+    flux_std = np.std(flux)
+    flux_norm = (flux - np.mean(flux)) / (flux_std if flux_std > 1e-6 else 1.0)
+
+    # Peak picking with minimum spacing (wait frames = ~350ms)
+    wait_frames = max(5, int(0.35 / (hop_length / sr)))
+    peaks = librosa.util.peak_pick(
+        flux_norm,
+        pre_max=4,
+        post_max=4,
+        pre_avg=4,
+        post_avg=4,
+        delta=0.6,
+        wait=wait_frames,
+    )
+
+    times = librosa.frames_to_time(peaks, sr=sr, hop_length=hop_length)
+
+    # Filter out boundary points too close to audio start or end
+    margin = 0.25
+    valid_times = [float(t) for t in times if margin <= t <= (total_duration - margin)]
+
+    # If peak picker found no interior points, pick top flux variance frames
+    if not valid_times and len(flux_norm) > 10:
+        center_start = int(len(flux_norm) * 0.2)
+        center_end = int(len(flux_norm) * 0.8)
+        if center_end > center_start:
+            top_idx = center_start + int(np.argmax(flux_norm[center_start:center_end]))
+            valid_times = [float(librosa.frames_to_time(top_idx, sr=sr, hop_length=hop_length))]
+
+    # Limit to top max_points by flux magnitude
+    if len(valid_times) > max_points:
+        # Sort by peak flux strength
+        time_flux_pairs = []
+        for t in valid_times:
+            f_idx = min(len(flux) - 1, max(0, int(t * sr / hop_length)))
+            time_flux_pairs.append((t, flux[f_idx]))
+        time_flux_pairs.sort(key=lambda x: x[1], reverse=True)
+        valid_times = sorted([t for t, _ in time_flux_pairs[:max_points]])
+
+    sec_before = window_ms_before / 1000.0
+    sec_after = window_ms_after / 1000.0
+
+    points: List[CodeSwitchPoint] = []
+    for t in valid_times:
+        w_start = max(0.0, t - sec_before)
+        w_end = min(total_duration, t + sec_after)
+        points.append(
+            CodeSwitchPoint(
+                timestamp_sec=float(t),
+                from_lang="ACOUSTIC",
+                to_lang="SEAM",
+                window_start_sec=float(w_start),
+                window_end_sec=float(w_end),
+            )
+        )
+
+    return points
+
+
 def find_codeswitch_points(
     audio_path: str,
     transcript_tokens: List[str],
@@ -278,4 +365,5 @@ def find_codeswitch_points(
             )
 
     return points
+
 
