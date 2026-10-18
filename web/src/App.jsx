@@ -61,9 +61,12 @@ export default function App() {
   const [analysisResult, setAnalysisResult] = useState(null);
   const [showTechnicalLog, setShowTechnicalLog] = useState(false);
 
-  // Live Microphone states
+  // Live Microphone & Streaming Call Guard states
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const [isStreamingGuard, setIsStreamingGuard] = useState(false);
+  const [streamTelemetry, setStreamTelemetry] = useState(null);
+  const wsStreamRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
@@ -245,6 +248,62 @@ export default function App() {
     } catch (err) {
       setFormError(`Microphone access error: ${err.message}`);
     }
+  };
+
+  // Start Live Streaming Call Guard
+  const startStreamingGuard = async () => {
+    try {
+      setFormError("");
+      setApiError("");
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const wsUrl = (API_BASE ? API_BASE.replace(/^http/, "ws") : "ws://127.0.0.1:8000") + "/ws/stream_analyze";
+      const ws = new WebSocket(wsUrl);
+      wsStreamRef.current = ws;
+
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 8000 });
+      const source = audioCtx.createMediaStreamSource(stream);
+      const processor = audioCtx.createScriptProcessor(2048, 1, 1);
+
+      processor.onaudioprocess = (e) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          const inputData = e.inputBuffer.getChannelData(0);
+          ws.send(inputData.buffer);
+        }
+      };
+
+      source.connect(processor);
+      processor.connect(audioCtx.destination);
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "telemetry") {
+            setStreamTelemetry(data);
+          }
+        } catch (err) {
+          console.warn("WS parse error:", err);
+        }
+      };
+
+      ws.onerror = () => {
+        setFormError("Streaming WebSocket connection error. Check backend.");
+        stopStreamingGuard();
+      };
+
+      setIsStreamingGuard(true);
+      startVisualizer(stream);
+    } catch (err) {
+      setFormError(`Live Guard activation error: ${err.message}`);
+    }
+  };
+
+  const stopStreamingGuard = () => {
+    if (wsStreamRef.current) {
+      wsStreamRef.current.close();
+      wsStreamRef.current = null;
+    }
+    setIsStreamingGuard(false);
+    stopVisualizer();
   };
 
   // Stop microphone
@@ -451,7 +510,7 @@ export default function App() {
                     style={{ flex: 1, borderColor: "var(--crimson-border)", color: "var(--crimson-text)" }}
                     onClick={startRecording}
                   >
-                    🎙️ Record Live Voice
+                    🎙️ Record Clip
                   </button>
                 ) : (
                   <button
@@ -460,13 +519,56 @@ export default function App() {
                     style={{ flex: 1, background: "var(--crimson-glow)", color: "var(--crimson-text)", borderColor: "var(--crimson-border)" }}
                     onClick={stopRecording}
                   >
-                    ⏹️ Stop Recording ({recordingDuration}s)
+                    ⏹️ Stop Clip ({recordingDuration}s)
+                  </button>
+                )}
+
+                {!isStreamingGuard ? (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ flex: 1, borderColor: "var(--cyan-border)", color: "var(--cyan-pure)", background: "var(--cyan-glow)" }}
+                    onClick={startStreamingGuard}
+                  >
+                    📡 Live Call Guard
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ flex: 1, background: "rgba(6, 182, 212, 0.3)", color: "#a5f3fc", borderColor: "var(--cyan-pure)" }}
+                    onClick={stopStreamingGuard}
+                  >
+                    ⏹️ Halt Guard
                   </button>
                 )}
               </div>
 
+              {/* Live Streaming Call Guard Status HUD */}
+              {isStreamingGuard && (
+                <div style={{ marginTop: "12px", padding: "12px", background: "var(--bg-surface)", border: "1px solid var(--cyan-border)", borderRadius: "8px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span className="pulse-dot" style={{ background: "var(--cyan-pure)" }}></span>
+                      <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--cyan-pure)", letterSpacing: "0.04em" }}>
+                        STREAMING CALL GUARD ACTIVE
+                      </span>
+                    </div>
+                    <span className="mono-text" style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                      Chunk #{streamTelemetry?.chunk_id || 0} &bull; {streamTelemetry?.buffer_duration_sec || 0}s buffer
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                    <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>Instantaneous Spoof Risk:</span>
+                    <span className="mono-text" style={{ fontSize: "16px", fontWeight: 800, color: (streamTelemetry?.spoof_probability || 0) > 0.5 ? "var(--crimson-pure)" : "var(--emerald-pure)" }}>
+                      {((streamTelemetry?.spoof_probability || 0) * 100).toFixed(1)}% ({streamTelemetry?.alert_level || "MONITORING"})
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Live Canvas for mic */}
-              {isRecording && (
+              {(isRecording || isStreamingGuard) && (
                 <div style={{ marginTop: "10px", borderRadius: "8px", overflow: "hidden", border: "1px solid var(--border-medium)" }}>
                   <canvas ref={canvasRef} width={420} height={48} style={{ display: "block", width: "100%" }} />
                 </div>

@@ -304,7 +304,7 @@ async def websocket_stream_analyze(websocket: WebSocket):
     await websocket.accept()
     model, projector, cfg = get_pipeline()
     buffer = np.zeros(0, dtype=np.float32)
-    sr = 16000
+    sr = 8000
     chunk_count = 0
 
     try:
@@ -320,22 +320,24 @@ async def websocket_stream_analyze(websocket: WebSocket):
                 buffer = np.concatenate([buffer, chunk])
                 chunk_count += 1
 
-                # Keep rolling window of last 3 seconds
-                max_buffer_len = sr * 3
+                # Keep rolling buffer of last 5.0 seconds
+                max_buffer_len = sr * 5
                 if len(buffer) > max_buffer_len:
                     buffer = buffer[-max_buffer_len:]
 
-                if len(buffer) >= int(1.2 * sr):
+                # Stable streaming: requires >= 2.5s of telephony buffer for reliable prosodic continuity
+                if len(buffer) >= int(2.5 * sr):
                     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_chunk:
                         tmp_chunk_path = tmp_chunk.name
                     save_audio(tmp_chunk_path, buffer, sr)
 
                     try:
-                        points = find_codeswitch_points(
+                        from vaanishield.boundary.localization import find_acoustic_change_points
+                        points = find_acoustic_change_points(
                             audio_path=tmp_chunk_path,
-                            transcript_tokens=["stream", "call", "audio", "buffer"],
-                            window_ms_before=300,
-                            window_ms_after=300,
+                            window_ms_before=250,
+                            window_ms_after=250,
+                            max_points=4,
                         )
                         b_feats = extract_boundary_features(tmp_chunk_path, points)
                         agg_vec = aggregate_boundary_features(b_feats, aggregation="mean_and_max")
