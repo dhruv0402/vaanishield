@@ -850,9 +850,9 @@ export default function App() {
               <div className="mono-text" style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>95% CI: [2.0%, 30.0%]</div>
             </div>
             <div className="risk-meter-box">
-              <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>HELDOUT SPEAKER EER</div>
-              <div style={{ fontSize: "20px", fontWeight: 800, color: "#10b981" }}>2.00%</div>
-              <div className="mono-text" style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>95% CI: [0.0%, 18.0%]</div>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>HELDOUT SYNTHESIZER EER</div>
+              <div style={{ fontSize: "20px", fontWeight: 800, color: "#f59e0b" }}>74.00%</div>
+              <div className="mono-text" style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>Microsoft Edge Neural Voice</div>
             </div>
             <div className="risk-meter-box">
               <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>VALIDATION EER</div>
@@ -872,7 +872,7 @@ export default function App() {
                   <th>Model Configuration</th>
                   <th>Val EER</th>
                   <th>Test EER (In-Domain)</th>
-                  <th>Held-Out Speaker EER</th>
+                  <th>Held-Out Synthesizer EER</th>
                   <th>Test Precision / Recall</th>
                 </tr>
               </thead>
@@ -881,21 +881,21 @@ export default function App() {
                   <td>Baseline A (Generic Acoustic + LR)</td>
                   <td>24.0%</td>
                   <td>39.0%</td>
-                  <td>32.0%</td>
+                  <td>12.0%</td>
                   <td>66.0% / 62.0%</td>
                 </tr>
                 <tr>
                   <td>Baseline B (Indian-Accent Mel + LFCC)</td>
                   <td>34.0%</td>
                   <td>48.0%</td>
-                  <td>22.0%</td>
+                  <td>14.0%</td>
                   <td>56.9% / 66.0%</td>
                 </tr>
                 <tr style={{ background: "rgba(16, 185, 129, 0.1)" }}>
                   <td><strong>VaaniShield Full Fused Model</strong></td>
                   <td style={{ color: "#10b981", fontWeight: 700 }}>0.0%</td>
                   <td style={{ color: "#10b981", fontWeight: 700 }}>14.0%</td>
-                  <td style={{ color: "#10b981", fontWeight: 700 }}>2.0%</td>
+                  <td style={{ color: "#f59e0b", fontWeight: 700 }}>74.0%</td>
                   <td style={{ color: "#10b981", fontWeight: 700 }}>88.4% / 76.0%</td>
                 </tr>
               </tbody>
@@ -912,7 +912,7 @@ export default function App() {
                 <tr>
                   <th>Stream Variant</th>
                   <th>Test EER</th>
-                  <th>Held-Out Speaker EER</th>
+                  <th>Held-Out Synthesizer EER</th>
                   <th>Finding & Role in Architecture</th>
                 </tr>
               </thead>
@@ -920,20 +920,20 @@ export default function App() {
                 <tr>
                   <td>Boundary-Local Stream Only</td>
                   <td>51.0%</td>
-                  <td>52.0%</td>
+                  <td>70.0%</td>
                   <td>Under narrowband telephony loss without vocoder conditioning, boundary cues alone operate near chance.</td>
                 </tr>
                 <tr>
                   <td>Speaker-Nulled Global Stream Only</td>
                   <td>22.0%</td>
-                  <td>6.0%</td>
-                  <td>Orthogonal projection removes speaker identity and detects vocoder synthesis artifacts.</td>
+                  <td>66.0%</td>
+                  <td>Orthogonal projection captures XTTS training vocoder signatures, but exhibits domain shift on unseen commercial neural TTS engines.</td>
                 </tr>
                 <tr style={{ background: "rgba(16, 185, 129, 0.1)" }}>
-                  <td><strong>VaaniShield Fused Model</strong></td>
+                  <td><strong>VaaniShield Full Fused Model</strong></td>
                   <td style={{ color: "#10b981", fontWeight: 700 }}>14.0%</td>
-                  <td style={{ color: "#10b981", fontWeight: 700 }}>2.0%</td>
-                  <td>Fusing boundary transition dynamics with speaker-nulled residuals yields lowest overall EER.</td>
+                  <td style={{ color: "#f59e0b", fontWeight: 700 }}>74.0%</td>
+                  <td>Fusing boundary transition dynamics with speaker-nulled residuals yields lowest in-domain error rate (14.0% vs 39.0%/48.0% baselines).</td>
                 </tr>
               </tbody>
             </table>

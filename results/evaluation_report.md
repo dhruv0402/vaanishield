@@ -24,20 +24,20 @@
 
 ## 3. Generalization to Unseen Synthesizer (Held-Out Set)
 
-> **Verdict**: VaaniShield statistically outperforms all baselines (EER 0.0200 vs best baseline 0.2200, p < 0.05).
+> **Verdict**: VaaniShield demonstrates an EER of 0.7400 compared to best baseline 0.1200; baseline performance is higher on this configuration.
 
 | Model | Generalization EER | 95% Confidence Interval | Precision | Recall |
 | :--- | :--- | :--- | :--- | :--- |
-| Baseline A (Generic SSL) | 0.3200 | [0.1000, 0.4416] | 0.6897 | 0.8000 |
-| Baseline B (Indian Accent Mel+LFCC) | 0.2200 | [0.0990, 0.4396] | 0.6250 | 0.8000 |
-| **VaaniShield (Boundary + SNAP Fusion)** | 0.0200 | [0.0000, 0.1796] | 0.8621 | 1.0000 |
+| Baseline A (Generic SSL) | 0.1200 | [0.0435, 0.3751] | 0.6897 | 0.8000 |
+| Baseline B (Indian Accent Mel+LFCC) | 0.1400 | [0.0582, 0.3809] | 0.6250 | 0.8000 |
+| **VaaniShield (Boundary + SNAP Fusion)** | 0.7400 | [0.3623, 1.0000] | 0.0000 | 0.0000 |
 
 ## 4. Performance Breakdown by Telecom Noise Condition (VaaniShield Test Split)
 
 | Noise Condition | EER | 95% Confidence Interval | Precision | Recall |
 | :--- | :--- | :--- | :--- | :--- |
+| codec_compression | 0.0500 | [0.0000, 0.3352] | 0.9000 | 0.9000 |
+| amr_wb_compression | 0.0500 | [0.0000, 0.3586] | 0.9000 | 0.9000 |
 | background_noise_injection | 0.3500 | [0.0455, 0.6319] | 0.6000 | 0.3000 |
 | packet_loss_simulation | 0.1000 | [0.0000, 0.3683] | 1.0000 | 0.8000 |
-| amr_wb_compression | 0.0500 | [0.0000, 0.3586] | 0.9000 | 0.9000 |
 | clean | 0.0500 | [0.0000, 0.3586] | 0.9000 | 0.9000 |
-| codec_compression | 0.0500 | [0.0000, 0.3352] | 0.9000 | 0.9000 |

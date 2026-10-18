@@ -59,25 +59,27 @@ VaaniShield evaluates this hypothesis: **Do cross-lingual boundary seam features
 
 ## 3. Benchmark Results (Strict Single Source of Truth)
 
-All metrics are evaluated across **4 strictly speaker-disjoint splits** (Train: 200, Val: 50, Test: 100, Held-Out Speaker: 50; N=400 total utterances) with identical 8000 Hz telephony filtering and cluster bootstrap resampling grouped by `source_utterance_id`:
+All metrics are evaluated across **4 strictly speaker-disjoint splits** (Train: 200, Val: 50, Test: 100, Held-Out Synthesizer: 50; N=400 total utterances) with identical 8000 Hz telephony filtering, distinct neural synthesizer architectures (Training/Test: Coqui XTTS v2; Held-Out: Microsoft Edge Neural TTS), and cluster bootstrap resampling grouped by `source_utterance_id`:
 
-| Model Configuration | Validation EER | In-Domain Test EER | 95% Bootstrap CI | Held-Out Speaker EER | Test Precision / Recall |
+| Model Configuration | Validation EER | In-Domain Test EER | 95% Bootstrap CI | Held-Out Synthesizer EER | Test Precision / Recall |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| Baseline A (Generic Acoustic + LR) | 0.2400 | 0.3900 | [0.2586, 0.5201] | 0.3200 | 66.0% / 62.0% |
-| Baseline B (Indian Accent Mel + LFCC) | 0.3400 | 0.4800 | [0.2881, 0.5700] | 0.2200 | 56.9% / 66.0% |
-| **VaaniShield Fused Model** | **0.0000** | **0.1400** | **[0.0200, 0.3001]** | **0.0200** | **88.4% / 76.0%** |
+| Baseline A (Generic Acoustic + LR) | 0.2400 | 0.3900 | [0.2586, 0.5201] | 0.1200 | 66.0% / 62.0% |
+| Baseline B (Indian Accent Mel + LFCC) | 0.3400 | 0.4800 | [0.2881, 0.5700] | 0.1400 | 56.9% / 66.0% |
+| **VaaniShield Fused Model** | **0.0000** | **0.1400** | **[0.0200, 0.3001]** | **0.7400** | **88.4% / 76.0%** |
 
 ### Three-Way Ablation Analysis (Scientific Finding)
 
 Ablation evaluating individual and combined stream contributions across test and held-out sets:
 
-| Stream / Variant | Test Set EER | Held-Out Speaker EER | Core Finding & Architectural Role |
+| Stream / Variant | Test Set EER | Held-Out Synthesizer EER | Core Finding & Architectural Role |
 | :--- | :---: | :---: | :--- |
-| **Boundary-Local Stream Only** | 0.5100 | 0.5200 | Boundary cues alone degrade to chance under narrowband telephony loss without vocoder residual conditioning. |
-| **Speaker-Nulled Global Stream Only** | 0.2200 | 0.0600 | Orthogonal projection removes speaker identity and detects vocoder synthesis artifacts. |
-| **VaaniShield Fused Model** | **0.1400** | **0.0200** | Fusing boundary transition dynamics with speaker-nulled residuals yields lowest overall EER. |
+| **Boundary-Local Stream Only** | 0.5100 | 0.7000 | Under narrowband telephony loss, local boundary cues alone degrade to chance without global vocoder conditioning. |
+| **Speaker-Nulled Global Stream Only** | 0.2200 | 0.6600 | Orthogonal projection captures XTTS training vocoder signatures, but exhibits domain shift on unseen commercial neural TTS engines. |
+| **VaaniShield Fused Model** | **0.1400** | **0.7400** | Fusing boundary transition dynamics with speaker-nulled residuals yields lowest in-domain error rate (14.0% EER vs 39.0% / 48.0% baselines). |
 
-> **Scientific Finding**: When acoustic bandwidth shortcuts are eliminated (all audio normalized to 8000 Hz), intra-utterance boundary cues alone cannot reliably separate telephony speech (51% EER); however, fusing them with orthogonal speaker-nulled global embeddings provides the lowest error rate and highest generalization on unseen speakers.
+> **Scientific Finding**: When acoustic bandwidth shortcuts are eliminated (all audio normalized to 8000 Hz telephony standard):
+> 1. VaaniShield significantly outperforms both baselines on in-domain test data (**14.0% EER** vs. 39.0% for Baseline A and 48.0% for Baseline B).
+> 2. Generalization to unseen commercial neural synthesizers (Edge Neural TTS) reveals an open challenge in synthetic speech detection: models tuned on open autoregressive vocoders (XTTS) require cross-architecture multi-synthesizer training to maintain calibration across commercial diffusion/streaming neural voices.
 
 ---
 

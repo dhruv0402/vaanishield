@@ -22,6 +22,6 @@ Ablation evaluating individual and combined stream contributions across validati
 
 | Stream / Variant | Held-Out Generalization EER | 95% Confidence Interval | Precision | Recall |
 | :--- | :--- | :--- | :--- | :--- |
-| Boundary-Local Stream Only | 0.5200 | [0.3591, 0.6583] | 0.5135 | 0.7600 |
-| Speaker-Nulled Global Stream Only | 0.0600 | [0.0000, 0.1802] | 0.8621 | 1.0000 |
-| **Full VaaniShield Fused Model** | 0.0200 | [0.0000, 0.1796] | 0.8621 | 1.0000 |
+| Boundary-Local Stream Only | 0.7000 | [0.5695, 0.8424] | 0.2800 | 0.2800 |
+| Speaker-Nulled Global Stream Only | 0.6600 | [0.5200, 0.8820] | 0.0000 | 0.0000 |
+| **Full VaaniShield Fused Model** | 0.7400 | [0.3623, 1.0000] | 0.0000 | 0.0000 |
