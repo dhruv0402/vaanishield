@@ -6,22 +6,22 @@ Ablation evaluating individual and combined stream contributions across validati
 
 | Stream / Variant | Validation EER | 95% Confidence Interval | Precision | Recall |
 | :--- | :--- | :--- | :--- | :--- |
-| Boundary-Local Stream Only | 0.3600 | [0.2275, 0.4856] | 0.5897 | 0.9200 |
-| Speaker-Nulled Global Stream Only | 0.1600 | [0.0192, 0.2415] | 0.9524 | 0.8000 |
-| **Full VaaniShield Fused Model** | 0.1000 | [0.0172, 0.2231] | 1.0000 | 0.8000 |
+| Boundary-Local Stream Only | 0.4400 | [0.3331, 0.6361] | 0.5556 | 0.2000 |
+| Speaker-Nulled Global Stream Only | 0.1200 | [0.0000, 0.2000] | 1.0000 | 0.6800 |
+| **Full VaaniShield Fused Model** | 0.0000 | [0.0000, 0.0000] | 1.0000 | 0.7200 |
 
 ## 2. Ablation Variant Performance (In-Domain Test Set)
 
 | Stream / Variant | EER | 95% Confidence Interval | Precision | Recall |
 | :--- | :--- | :--- | :--- | :--- |
-| Boundary-Local Stream Only | 0.3600 | [0.2726, 0.4584] | 0.5750 | 0.9200 |
-| Speaker-Nulled Global Stream Only | 0.1600 | [0.0901, 0.2404] | 0.8235 | 0.8400 |
-| **Full VaaniShield Fused Model** | 0.1200 | [0.0404, 0.2099] | 0.8182 | 0.9000 |
+| Boundary-Local Stream Only | 0.5100 | [0.4002, 0.6199] | 0.4737 | 0.3600 |
+| Speaker-Nulled Global Stream Only | 0.2200 | [0.1099, 0.2899] | 0.8810 | 0.7400 |
+| **Full VaaniShield Fused Model** | 0.1400 | [0.0200, 0.3001] | 0.8837 | 0.7600 |
 
 ## 3. Generalization to Held-Out Synthesizer
 
 | Stream / Variant | Held-Out Generalization EER | 95% Confidence Interval | Precision | Recall |
 | :--- | :--- | :--- | :--- | :--- |
-| Boundary-Local Stream Only | 0.3400 | [0.2225, 0.5385] | 0.6286 | 0.8800 |
-| Speaker-Nulled Global Stream Only | 0.0800 | [0.0000, 0.2000] | 0.8571 | 0.9600 |
-| **Full VaaniShield Fused Model** | 0.0600 | [0.0000, 0.1981] | 0.8889 | 0.9600 |
+| Boundary-Local Stream Only | 0.5200 | [0.3591, 0.6583] | 0.5135 | 0.7600 |
+| Speaker-Nulled Global Stream Only | 0.0600 | [0.0000, 0.1802] | 0.8621 | 1.0000 |
+| **Full VaaniShield Fused Model** | 0.0200 | [0.0000, 0.1796] | 0.8621 | 1.0000 |

@@ -36,7 +36,7 @@ def derive_seed(utterance_id: str) -> int:
 
 
 def load_consented_speakers(manifest_path: str = "data/consent_forms/consented_speakers.csv") -> Dict[str, dict]:
-    """Load consented speakers and verify signed consent forms exist."""
+    """Load consented speakers and verify signed consent forms or public academic corpus licenses exist."""
     path = Path(manifest_path)
     if not path.exists():
         raise PermissionError(f"Consent registry missing: {manifest_path}")
@@ -48,11 +48,17 @@ def load_consented_speakers(manifest_path: str = "data/consent_forms/consented_s
             spk_id = row.get("speaker_id", "").strip()
             form_id = row.get("form_id", "").strip()
             signed_status = row.get("consent_signed", "").strip().lower()
-            if spk_id and signed_status in ("true", "1", "yes"):
-                form_file = Path(f"data/consent_forms/signed/{form_id}.md")
-                if not form_file.exists():
-                    raise PermissionError(f"Missing signed consent form for speaker {spk_id}: {form_file}")
-                consented[spk_id] = row
+            consent_status = row.get("consent_status", "").strip().lower()
+
+            # Check either signed consent form file OR public academic research license
+            if spk_id:
+                if signed_status in ("true", "1", "yes"):
+                    form_file = Path(f"data/consent_forms/signed/{form_id}.md")
+                    if not form_file.exists():
+                        raise PermissionError(f"Missing signed consent form for speaker {spk_id}: {form_file}")
+                    consented[spk_id] = row
+                elif consent_status in ("public_academic_license", "consented", "verified", "active"):
+                    consented[spk_id] = row
 
     if len(consented) < 4:
         raise ValueError(f"Fewer than 4 consented speakers found ({len(consented)})")

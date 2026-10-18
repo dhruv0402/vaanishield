@@ -234,7 +234,8 @@ async def analyze_audio(
             risk_level = "SECURE"
             action_taken = "VERIFIED_GENUINE"
 
-        # 6. Privacy-compliant acoustic explanations (zero transcript leakage)
+        # 6. Privacy-compliant acoustic explanations (zero transcript leakage per DPDPA 2023)
+        # Transform features using fitted scaler for correct linear weight attribution
         fused_vector = np.concatenate([agg_vec, nulled_emb])
         raw_model = getattr(model, "model_", model)
         explanations = explain_prediction(
@@ -249,6 +250,7 @@ async def analyze_audio(
         step = max(1, len(audio_data) // 120)
         waveform_peaks = [float(abs(audio_data[i])) for i in range(0, len(audio_data), step)][:120]
 
+        # Strictly non-semantic metadata returned: no spoken text or transcript stored/returned
         return {
             "status": "success",
             "is_spoof": is_spoof,
@@ -257,13 +259,11 @@ async def analyze_audio(
             "operational_decision": {
                 "decision": decision_action,
                 "risk_tier": risk_level,
-                "tau_review": 0.48,
-                "tau_block": 0.52,
+                "tau_review": getattr(model, "tau_review", 0.48),
+                "tau_block": getattr(model, "tau_block", 0.52),
                 "recommended_action": action_taken,
             },
             "action_taken": action_taken,
-            "transcription": effective_transcript,
-            "transcription_method": transcription_method,
             "audio_metadata": {
                 "duration_sec": round(duration_sec, 2),
                 "sample_rate_hz": sr,

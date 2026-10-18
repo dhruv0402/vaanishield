@@ -74,15 +74,15 @@ def evaluate_models(
 
     val_audio_paths = [r["audio_path"] for r in val_records]
     y_val = np.array([1 if r.get("label") == "spoof" else 0 for r in val_records], dtype=np.int32)
-    val_speakers = np.array([r.get("speaker_id", "unknown") for r in val_records])
+    val_clusters = np.array([r.get("source_utterance_id", r.get("speaker_id", "unknown")) for r in val_records])
     val_breakdowns = {
         "noise_condition": [r.get("noise_condition", "clean") for r in val_records],
-        "language_pair": [r.get("language_pair", "ta-en") for r in val_records],
+        "language_pair": [r.get("language_pair", "hi-en") for r in val_records],
     }
 
     test_audio_paths = [r["audio_path"] for r in test_records]
     y_test = np.array([1 if r.get("label") == "spoof" else 0 for r in test_records], dtype=np.int32)
-    test_speakers = np.array([r.get("speaker_id", "unknown") for r in test_records])
+    test_clusters = np.array([r.get("source_utterance_id", r.get("speaker_id", "unknown")) for r in test_records])
     test_breakdowns = {
         "noise_condition": [r.get("noise_condition", "clean") for r in test_records],
         "language_pair": [r.get("language_pair", "hi-en") for r in test_records],
@@ -90,7 +90,7 @@ def evaluate_models(
 
     heldout_audio_paths = [r["audio_path"] for r in heldout_records]
     y_heldout = np.array([1 if r.get("label") == "spoof" else 0 for r in heldout_records], dtype=np.int32)
-    heldout_speakers = np.array([r.get("speaker_id", "unknown") for r in heldout_records])
+    heldout_clusters = np.array([r.get("source_utterance_id", r.get("speaker_id", "unknown")) for r in heldout_records])
     heldout_breakdowns = {
         "noise_condition": [r.get("noise_condition", "clean") for r in heldout_records],
         "language_pair": [r.get("language_pair", "hi-en") for r in heldout_records],
@@ -191,18 +191,18 @@ def evaluate_models(
 
     logger.info(f"Wrote scores single source of truth to {scores_csv_path}")
 
-    # Evaluate by breakdown using cluster/sample bootstrap
-    eval_ba_val = evaluate_by_breakdown(preds_ba_val, y_val, val_breakdowns, clusters=val_speakers) if val_records else {}
-    eval_ba_test = evaluate_by_breakdown(preds_ba_test, y_test, test_breakdowns, clusters=test_speakers)
-    eval_ba_heldout = evaluate_by_breakdown(preds_ba_heldout, y_heldout, heldout_breakdowns, clusters=heldout_speakers)
+    # Evaluate by breakdown using cluster/sample bootstrap (clustered by source_utterance_id)
+    eval_ba_val = evaluate_by_breakdown(preds_ba_val, y_val, val_breakdowns, clusters=val_clusters) if val_records else {}
+    eval_ba_test = evaluate_by_breakdown(preds_ba_test, y_test, test_breakdowns, clusters=test_clusters)
+    eval_ba_heldout = evaluate_by_breakdown(preds_ba_heldout, y_heldout, heldout_breakdowns, clusters=heldout_clusters)
 
-    eval_bb_val = evaluate_by_breakdown(preds_bb_val, y_val, val_breakdowns, clusters=val_speakers) if val_records else {}
-    eval_bb_test = evaluate_by_breakdown(preds_bb_test, y_test, test_breakdowns, clusters=test_speakers)
-    eval_bb_heldout = evaluate_by_breakdown(preds_bb_heldout, y_heldout, heldout_breakdowns, clusters=heldout_speakers)
+    eval_bb_val = evaluate_by_breakdown(preds_bb_val, y_val, val_breakdowns, clusters=val_clusters) if val_records else {}
+    eval_bb_test = evaluate_by_breakdown(preds_bb_test, y_test, test_breakdowns, clusters=test_clusters)
+    eval_bb_heldout = evaluate_by_breakdown(preds_bb_heldout, y_heldout, heldout_breakdowns, clusters=heldout_clusters)
 
-    eval_fusion_val = evaluate_by_breakdown(preds_fusion_val, y_val, val_breakdowns, clusters=val_speakers) if val_records else {}
-    eval_fusion_test = evaluate_by_breakdown(preds_fusion_test, y_test, test_breakdowns, clusters=test_speakers)
-    eval_fusion_heldout = evaluate_by_breakdown(preds_fusion_heldout, y_heldout, heldout_breakdowns, clusters=heldout_speakers)
+    eval_fusion_val = evaluate_by_breakdown(preds_fusion_val, y_val, val_breakdowns, clusters=val_clusters) if val_records else {}
+    eval_fusion_test = evaluate_by_breakdown(preds_fusion_test, y_test, test_breakdowns, clusters=test_clusters)
+    eval_fusion_heldout = evaluate_by_breakdown(preds_fusion_heldout, y_heldout, heldout_breakdowns, clusters=heldout_clusters)
 
     verdict_val = (
         generate_verdict(

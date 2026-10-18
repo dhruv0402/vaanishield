@@ -222,35 +222,31 @@ def extract_boundary_features(
     for pt in codeswitch_points:
         start_samp = max(0, int(pt.window_start_sec * sr))
         end_samp = min(total_samples, int(pt.window_end_sec * sr))
-        window = audio[start_samp:end_samp]
+        raw_window = audio[start_samp:end_samp]
 
-        if len(window) < int(0.04 * sr):
+        if len(raw_window) < int(0.04 * sr):
             feat_dict = {name: 0.0 for name in FEATURE_NAMES}
         else:
-            stft = np.abs(librosa.stft(window, n_fft=512, hop_length=160))
-            mel = librosa.power_to_db(librosa.feature.melspectrogram(S=stft**2, sr=sr, n_mels=40))
-            mfcc = librosa.feature.mfcc(S=mel, n_mfcc=13)
-            delta = librosa.feature.delta(mfcc)
-            cent = librosa.feature.spectral_centroid(S=stft, sr=sr)[0]
+            # Denoise window for robust acoustic tracking in telephony conditions
+            window = denoise_audio_window(raw_window, sr=sr)
 
-            # 1. f0_reset_magnitude: sub-band harmonic modulation ratio + Praat F0 reset across boundary
+            # 1. f0_reset_magnitude: normalized pitch jump across pre/post boundary
             f0_jump = extract_f0_reset_magnitude(window, sr)
-            subband_harmonic_shift = float(np.mean(mel[:10, :]) - np.mean(mel[10:25, :]))
-            # 2. energy_discontinuity: high-band (>3.5kHz) to mid-band (300-3.5kHz) log energy contrast
-            high_band_jump = float(np.mean(mel[28:, :]) - np.mean(mel[5:25, :]))
-            # 3. phone_duration_ratio: temporal envelope modulation across boundary phones
-            env_mod = float(np.mean(np.std(mel, axis=1)))
-            # 4. formant_transition_smoothness: normalized spectral centroid smoothness across boundary
-            formant_smooth = float(np.mean(cent) / 4000.0)
-            # 5. mfcc_delta_magnitude: cepstral trajectory dispersion + delta magnitude across boundary
-            mfcc_delta = float(np.mean(np.std(mfcc[1:8, :], axis=1)) + np.mean(np.abs(delta[1:8, :])))
+            # 2. energy_discontinuity: noise-compensated RMS step across boundary
+            energy_jump = extract_energy_discontinuity(window, sr)
+            # 3. phone_duration_ratio: local active segment duration vs baseline
+            duration_ratio = extract_phone_duration_ratio(window, sr, speaker_baseline)
+            # 4. formant_transition_smoothness: spectral transition trajectory across boundary
+            formant_smooth = extract_formant_transition_smoothness(window, sr)
+            # 5. mfcc_delta_magnitude: frame-to-frame delta magnitude across boundary
+            mfcc_delta = extract_mfcc_delta_magnitude(window, sr)
 
             feat_dict = {
-                "f0_reset_magnitude": subband_harmonic_shift + f0_jump,
-                "energy_discontinuity": high_band_jump,
-                "phone_duration_ratio": env_mod,
-                "formant_transition_smoothness": formant_smooth,
-                "mfcc_delta_magnitude": mfcc_delta,
+                "f0_reset_magnitude": float(f0_jump),
+                "energy_discontinuity": float(energy_jump),
+                "phone_duration_ratio": float(duration_ratio),
+                "formant_transition_smoothness": float(formant_smooth),
+                "mfcc_delta_magnitude": float(mfcc_delta),
             }
 
         vectors.append(BoundaryFeatureVector(codeswitch_point=pt, features=feat_dict))

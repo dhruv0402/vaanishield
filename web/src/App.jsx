@@ -846,18 +846,18 @@ export default function App() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "20px" }}>
             <div className="risk-meter-box">
               <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>IN-DOMAIN TEST EER</div>
-              <div style={{ fontSize: "20px", fontWeight: 800, color: "#10b981" }}>12.00%</div>
-              <div className="mono-text" style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>95% CI: [8.0%, 16.0%]</div>
+              <div style={{ fontSize: "20px", fontWeight: 800, color: "#10b981" }}>14.00%</div>
+              <div className="mono-text" style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>95% CI: [2.0%, 30.0%]</div>
             </div>
             <div className="risk-meter-box">
               <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>HELDOUT SPEAKER EER</div>
-              <div style={{ fontSize: "20px", fontWeight: 800, color: "#10b981" }}>6.00%</div>
-              <div className="mono-text" style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>95% CI: [2.0%, 10.0%]</div>
+              <div style={{ fontSize: "20px", fontWeight: 800, color: "#10b981" }}>2.00%</div>
+              <div className="mono-text" style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>95% CI: [0.0%, 18.0%]</div>
             </div>
             <div className="risk-meter-box">
               <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>VALIDATION EER</div>
-              <div style={{ fontSize: "20px", fontWeight: 800, color: "#38bdf8" }}>10.00%</div>
-              <div className="mono-text" style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>95% CI: [4.0%, 16.0%]</div>
+              <div style={{ fontSize: "20px", fontWeight: 800, color: "#38bdf8" }}>0.00%</div>
+              <div className="mono-text" style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>95% CI: [0.0%, 0.0%]</div>
             </div>
           </div>
 
@@ -879,30 +879,30 @@ export default function App() {
               <tbody>
                 <tr>
                   <td>Baseline A (Generic Acoustic + LR)</td>
+                  <td>24.0%</td>
+                  <td>39.0%</td>
                   <td>32.0%</td>
-                  <td>19.0%</td>
-                  <td>32.0%</td>
-                  <td>72.1% / 88.0%</td>
+                  <td>66.0% / 62.0%</td>
                 </tr>
                 <tr>
                   <td>Baseline B (Indian-Accent Mel + LFCC)</td>
-                  <td>20.0%</td>
-                  <td>17.0%</td>
-                  <td>16.0%</td>
-                  <td>76.9% / 80.0%</td>
+                  <td>34.0%</td>
+                  <td>48.0%</td>
+                  <td>22.0%</td>
+                  <td>56.9% / 66.0%</td>
                 </tr>
                 <tr style={{ background: "rgba(16, 185, 129, 0.1)" }}>
                   <td><strong>VaaniShield Full Fused Model</strong></td>
-                  <td style={{ color: "#10b981", fontWeight: 700 }}>10.0%</td>
-                  <td style={{ color: "#10b981", fontWeight: 700 }}>12.0%</td>
-                  <td style={{ color: "#10b981", fontWeight: 700 }}>6.0%</td>
-                  <td style={{ color: "#10b981", fontWeight: 700 }}>81.8% / 90.0%</td>
+                  <td style={{ color: "#10b981", fontWeight: 700 }}>0.0%</td>
+                  <td style={{ color: "#10b981", fontWeight: 700 }}>14.0%</td>
+                  <td style={{ color: "#10b981", fontWeight: 700 }}>2.0%</td>
+                  <td style={{ color: "#10b981", fontWeight: 700 }}>88.4% / 76.0%</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <h3>2. Three-Way Ablation Analysis (Scientific Integrity)</h3>
+          <h3>2. Three-Way Ablation Analysis (Anti-Shortcut Verified)</h3>
           <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "8px" }}>
             Evaluating individual and combined stream contributions across test and held-out sets:
           </p>
@@ -919,20 +919,20 @@ export default function App() {
               <tbody>
                 <tr>
                   <td>Boundary-Local Stream Only</td>
-                  <td>36.0%</td>
-                  <td>34.0%</td>
-                  <td>Boundary cues alone degrade under heavy telephony codecs (PSTN/G.711).</td>
+                  <td>51.0%</td>
+                  <td>52.0%</td>
+                  <td>Under narrowband telephony loss without vocoder conditioning, boundary cues alone operate near chance.</td>
                 </tr>
                 <tr>
                   <td>Speaker-Nulled Global Stream Only</td>
-                  <td>16.0%</td>
-                  <td>8.0%</td>
-                  <td>Orthogonal projection removes speaker identity and carries the primary artifact signal.</td>
+                  <td>22.0%</td>
+                  <td>6.0%</td>
+                  <td>Orthogonal projection removes speaker identity and detects vocoder synthesis artifacts.</td>
                 </tr>
                 <tr style={{ background: "rgba(16, 185, 129, 0.1)" }}>
                   <td><strong>VaaniShield Fused Model</strong></td>
-                  <td style={{ color: "#10b981", fontWeight: 700 }}>12.0%</td>
-                  <td style={{ color: "#10b981", fontWeight: 700 }}>6.0%</td>
+                  <td style={{ color: "#10b981", fontWeight: 700 }}>14.0%</td>
+                  <td style={{ color: "#10b981", fontWeight: 700 }}>2.0%</td>
                   <td>Fusing boundary transition dynamics with speaker-nulled residuals yields lowest overall EER.</td>
                 </tr>
               </tbody>

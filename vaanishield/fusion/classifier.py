@@ -124,7 +124,7 @@ class FusionClassifier:
                 gen_s = val_probs[y_val == 0]
                 spf_s = val_probs[y_val == 1]
                 eer = compute_eer(gen_s, spf_s) if (len(gen_s) > 0 and len(spf_s) > 0) else 0.5
-                if eer + 0.03 < best_eer or best_calibrator is None:
+                if eer < best_eer or best_calibrator is None:
                     best_eer = eer
                     best_c = c_val
                     best_calibrator = cal

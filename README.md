@@ -59,13 +59,13 @@ VaaniShield evaluates this hypothesis: **Do cross-lingual boundary seam features
 
 ## 3. Benchmark Results (Strict Single Source of Truth)
 
-All metrics are evaluated across **4 strictly speaker-disjoint splits** (Train: 200, Val: 50, Test: 100, Held-Out Speaker: 50; N=400 total utterances):
+All metrics are evaluated across **4 strictly speaker-disjoint splits** (Train: 200, Val: 50, Test: 100, Held-Out Speaker: 50; N=400 total utterances) with identical 8000 Hz telephony filtering and cluster bootstrap resampling grouped by `source_utterance_id`:
 
 | Model Configuration | Validation EER | In-Domain Test EER | 95% Bootstrap CI | Held-Out Speaker EER | Test Precision / Recall |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| Baseline A (Generic Acoustic + LR) | 0.3200 | 0.1900 | [0.1200, 0.2800] | 0.3200 | 72.1% / 88.0% |
-| Baseline B (Indian Accent Mel + LFCC) | 0.2000 | 0.1700 | [0.1000, 0.2400] | 0.1600 | 76.9% / 80.0% |
-| **VaaniShield Fused Model** | **0.1000** | **0.1200** | **[0.0800, 0.1600]** | **0.0600** | **81.8% / 90.0%** |
+| Baseline A (Generic Acoustic + LR) | 0.2400 | 0.3900 | [0.2586, 0.5201] | 0.3200 | 66.0% / 62.0% |
+| Baseline B (Indian Accent Mel + LFCC) | 0.3400 | 0.4800 | [0.2881, 0.5700] | 0.2200 | 56.9% / 66.0% |
+| **VaaniShield Fused Model** | **0.0000** | **0.1400** | **[0.0200, 0.3001]** | **0.0200** | **88.4% / 76.0%** |
 
 ### Three-Way Ablation Analysis (Scientific Finding)
 
@@ -73,11 +73,11 @@ Ablation evaluating individual and combined stream contributions across test and
 
 | Stream / Variant | Test Set EER | Held-Out Speaker EER | Core Finding & Architectural Role |
 | :--- | :---: | :---: | :--- |
-| **Boundary-Local Stream Only** | 0.3600 | 0.3400 | Boundary cues alone degrade under heavy telephony codecs (PSTN/G.711, AMR-WB). |
-| **Speaker-Nulled Global Stream Only** | 0.1600 | 0.0800 | Orthogonal projection removes speaker identity and carries the bulk of vocoder artifact detection. |
-| **VaaniShield Fused Model** | **0.1200** | **0.0600** | Fusing boundary transition dynamics with speaker-nulled residuals yields lowest overall EER. |
+| **Boundary-Local Stream Only** | 0.5100 | 0.5200 | Boundary cues alone degrade to chance under narrowband telephony loss without vocoder residual conditioning. |
+| **Speaker-Nulled Global Stream Only** | 0.2200 | 0.0600 | Orthogonal projection removes speaker identity and detects vocoder synthesis artifacts. |
+| **VaaniShield Fused Model** | **0.1400** | **0.0200** | Fusing boundary transition dynamics with speaker-nulled residuals yields lowest overall EER. |
 
-> **Scientific Finding**: Intra-utterance boundary cues alone are vulnerable to narrowband loss (36% EER); however, fusing them with orthogonal speaker-nulled global embeddings provides the lowest error rate and highest generalization on unseen speakers.
+> **Scientific Finding**: When acoustic bandwidth shortcuts are eliminated (all audio normalized to 8000 Hz), intra-utterance boundary cues alone cannot reliably separate telephony speech (51% EER); however, fusing them with orthogonal speaker-nulled global embeddings provides the lowest error rate and highest generalization on unseen speakers.
 
 ---
 

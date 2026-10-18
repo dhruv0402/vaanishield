@@ -144,8 +144,8 @@ def evaluate_by_breakdown(
         if len(gen_scores) == 0 or len(spf_scores) == 0:
             return {
                 "count": int(len(sub_true)),
-                "eer": 0.0,
-                "eer_ci": [0.0, 0.0],
+                "eer": None,
+                "eer_ci": [None, None],
                 "precision": float(precision_score(sub_true, (sub_preds >= 0.5).astype(int), zero_division=0)),
                 "recall": float(recall_score(sub_true, (sub_preds >= 0.5).astype(int), zero_division=0)),
             }
