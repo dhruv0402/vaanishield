@@ -14,7 +14,7 @@ unseen speakers and unseen synthesizers.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Any
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.calibration import CalibratedClassifierCV
@@ -203,16 +203,24 @@ class FusionClassifier:
 
     def predict_operational_tier(
         self,
-        boundary_features: np.ndarray,
-        speaker_nulled_embeddings: np.ndarray,
+        boundary_features: Any,
+        speaker_nulled_embeddings: Optional[np.ndarray] = None,
         tau_review: float = 0.48,
         tau_block: float = 0.52,
-    ) -> list:
+    ) -> Any:
         """Evaluate two-tier operational risk decision:
         - 'PASS' (p < tau_review): Authenticated bona-fide speaker.
         - 'STEP_UP_REVIEW' (tau_review <= p < tau_block): High-sensitivity flag (88% Recall).
         - 'BLOCK' (p >= tau_block): High-precision fraud block (>=85% Precision).
         """
+        if speaker_nulled_embeddings is None and isinstance(boundary_features, (int, float, np.floating)):
+            p = float(boundary_features)
+            if p >= tau_block:
+                return "BLOCK_AND_ALERT"
+            elif p >= tau_review:
+                return "STEP_UP_AUTH"
+            return "ALLOW_VERIFIED"
+
         probs, ci_lower, ci_upper = self.predict_with_ci(boundary_features, speaker_nulled_embeddings)
         decisions = []
         for p, low, high in zip(probs, ci_lower, ci_upper):
