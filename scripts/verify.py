@@ -286,4 +286,5 @@ def run_verification(
 
 
 if __name__ == "__main__":
-    run_verification()
+    manifest = sys.argv[1] if len(sys.argv) > 1 else "data/processed/master_manifest.jsonl"
+    run_verification(manifest_path=manifest)

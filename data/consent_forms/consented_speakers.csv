@@ -1,17 +1,33 @@
-speaker_id,speaker_name,corpus_source,consent_status,source_license,regional_language
-spk_1119,OpenSLR 103 Contributor 1119,OpenSLR 103 Hindi,public_academic_license,OpenSLR 103 Public Academic License,hi
-spk_2131,OpenSLR 103 Contributor 2131,OpenSLR 103 Hindi,public_academic_license,OpenSLR 103 Public Academic License,hi
-spk_3701,OpenSLR 103 Contributor 3701,OpenSLR 103 Hindi,public_academic_license,OpenSLR 103 Public Academic License,hi
-spk_5945,OpenSLR 103 Contributor 5945,OpenSLR 103 Hindi,public_academic_license,OpenSLR 103 Public Academic License,hi
-spk_ta_01,OpenSLR 65 Tamil Contributor 00023,OpenSLR 65 Tamil,public_academic_license,CC BY-SA 4.0,ta
-spk_ta_02,OpenSLR 65 Tamil Contributor 00929,OpenSLR 65 Tamil,public_academic_license,CC BY-SA 4.0,ta
-spk_ta_03,OpenSLR 65 Tamil Contributor 00535,OpenSLR 65 Tamil,public_academic_license,CC BY-SA 4.0,ta
-spk_ta_04,OpenSLR 65 Tamil Contributor 01181,OpenSLR 65 Tamil,public_academic_license,CC BY-SA 4.0,ta
-spk_kn_01,OpenSLR 79 Kannada Contributor 00180,OpenSLR 79 Kannada,public_academic_license,CC BY-SA 4.0,kn
-spk_kn_02,OpenSLR 79 Kannada Contributor 00271,OpenSLR 79 Kannada,public_academic_license,CC BY-SA 4.0,kn
-spk_kn_03,OpenSLR 79 Kannada Contributor 00378,OpenSLR 79 Kannada,public_academic_license,CC BY-SA 4.0,kn
-spk_kn_04,OpenSLR 79 Kannada Contributor 00417,OpenSLR 79 Kannada,public_academic_license,CC BY-SA 4.0,kn
-spk_te_01,OpenSLR 66 Telugu Contributor 00113,OpenSLR 66 Telugu,public_academic_license,CC BY-SA 4.0,te
-spk_te_02,OpenSLR 66 Telugu Contributor 00682,OpenSLR 66 Telugu,public_academic_license,CC BY-SA 4.0,te
-spk_te_03,OpenSLR 66 Telugu Contributor 00974,OpenSLR 66 Telugu,public_academic_license,CC BY-SA 4.0,te
-spk_te_04,OpenSLR 66 Telugu Contributor 02477,OpenSLR 66 Telugu,public_academic_license,CC BY-SA 4.0,te
+speaker_id,speaker_name,gender,corpus_source,consent_status,source_license,regional_language
+spk_1119,OpenSLR 103 Contributor 1119,male,OpenSLR 103 Hindi,public_academic_license,OpenSLR 103 Public Academic License,hi
+spk_2131,OpenSLR 103 Contributor 2131,male,OpenSLR 103 Hindi,public_academic_license,OpenSLR 103 Public Academic License,hi
+spk_3701,OpenSLR 103 Contributor 3701,male,OpenSLR 103 Hindi,public_academic_license,OpenSLR 103 Public Academic License,hi
+spk_5945,OpenSLR 103 Contributor 5945,male,OpenSLR 103 Hindi,public_academic_license,OpenSLR 103 Public Academic License,hi
+spk_ta_01,OpenSLR 65 Tamil Contributor 00023,male,OpenSLR 65 Tamil,public_academic_license,CC BY-SA 4.0,ta
+spk_ta_02,OpenSLR 65 Tamil Contributor 00929,male,OpenSLR 65 Tamil,public_academic_license,CC BY-SA 4.0,ta
+spk_ta_03,OpenSLR 65 Tamil Contributor 00535,male,OpenSLR 65 Tamil,public_academic_license,CC BY-SA 4.0,ta
+spk_ta_04,OpenSLR 65 Tamil Contributor 01181,male,OpenSLR 65 Tamil,public_academic_license,CC BY-SA 4.0,ta
+spk_kn_01,OpenSLR 79 Kannada Contributor 00180,male,OpenSLR 79 Kannada,public_academic_license,CC BY-SA 4.0,kn
+spk_kn_02,OpenSLR 79 Kannada Contributor 00271,male,OpenSLR 79 Kannada,public_academic_license,CC BY-SA 4.0,kn
+spk_kn_03,OpenSLR 79 Kannada Contributor 00378,male,OpenSLR 79 Kannada,public_academic_license,CC BY-SA 4.0,kn
+spk_kn_04,OpenSLR 79 Kannada Contributor 00417,male,OpenSLR 79 Kannada,public_academic_license,CC BY-SA 4.0,kn
+spk_te_01,OpenSLR 66 Telugu Contributor 00113,male,OpenSLR 66 Telugu,public_academic_license,CC BY-SA 4.0,te
+spk_te_02,OpenSLR 66 Telugu Contributor 00682,male,OpenSLR 66 Telugu,public_academic_license,CC BY-SA 4.0,te
+spk_te_03,OpenSLR 66 Telugu Contributor 00974,male,OpenSLR 66 Telugu,public_academic_license,CC BY-SA 4.0,te
+spk_te_04,OpenSLR 66 Telugu Contributor 02477,male,OpenSLR 66 Telugu,public_academic_license,CC BY-SA 4.0,te
+spk_hi_f01,OpenSLR 103 Female Contributor 1102,female,OpenSLR 103 Hindi,public_academic_license,OpenSLR 103 Public Academic License,hi
+spk_hi_f02,OpenSLR 103 Female Contributor 1104,female,OpenSLR 103 Hindi,public_academic_license,OpenSLR 103 Public Academic License,hi
+spk_hi_f03,OpenSLR 103 Female Contributor 1120,female,OpenSLR 103 Hindi,public_academic_license,OpenSLR 103 Public Academic License,hi
+spk_hi_f04,OpenSLR 103 Female Contributor 1125,female,OpenSLR 103 Hindi,public_academic_license,OpenSLR 103 Public Academic License,hi
+spk_ta_f01,OpenSLR 65 Tamil Female Contributor 00008,female,OpenSLR 65 Tamil,public_academic_license,CC BY-SA 4.0,ta
+spk_ta_f02,OpenSLR 65 Tamil Female Contributor 01484,female,OpenSLR 65 Tamil,public_academic_license,CC BY-SA 4.0,ta
+spk_ta_f03,OpenSLR 65 Tamil Female Contributor 02027,female,OpenSLR 65 Tamil,public_academic_license,CC BY-SA 4.0,ta
+spk_ta_f04,OpenSLR 65 Tamil Female Contributor 02042,female,OpenSLR 65 Tamil,public_academic_license,CC BY-SA 4.0,ta
+spk_kn_f01,OpenSLR 79 Kannada Female Contributor 00001,female,OpenSLR 79 Kannada,public_academic_license,CC BY-SA 4.0,kn
+spk_kn_f02,OpenSLR 79 Kannada Female Contributor 00254,female,OpenSLR 79 Kannada,public_academic_license,CC BY-SA 4.0,kn
+spk_kn_f03,OpenSLR 79 Kannada Female Contributor 00557,female,OpenSLR 79 Kannada,public_academic_license,CC BY-SA 4.0,kn
+spk_kn_f04,OpenSLR 79 Kannada Female Contributor 01493,female,OpenSLR 79 Kannada,public_academic_license,CC BY-SA 4.0,kn
+spk_te_f01,OpenSLR 66 Telugu Female Contributor 01033,female,OpenSLR 66 Telugu,public_academic_license,CC BY-SA 4.0,te
+spk_te_f02,OpenSLR 66 Telugu Female Contributor 01908,female,OpenSLR 66 Telugu,public_academic_license,CC BY-SA 4.0,te
+spk_te_f03,OpenSLR 66 Telugu Female Contributor 02828,female,OpenSLR 66 Telugu,public_academic_license,CC BY-SA 4.0,te
+spk_te_f04,OpenSLR 66 Telugu Female Contributor 03689,female,OpenSLR 66 Telugu,public_academic_license,CC BY-SA 4.0,te

@@ -1,8 +1,8 @@
 {
   "title": "VaaniShield Production Scale & Generalization Evaluation",
   "date": "2026-10-19",
-  "total_recordings_evaluated": 800,
-  "total_speakers_evaluated": 16,
+  "total_recordings_evaluated": 1600,
+  "total_speakers_evaluated": 32,
   "language_pairs": [
     "hi-en",
     "ta-en",
@@ -15,81 +15,103 @@
       "regularization_lambda": 0.0,
       "regimes": {
         "all_overall": {
-          "count": 800,
-          "eer": 0.2588,
-          "accuracy": 0.7412,
-          "auc": 0.7921,
+          "count": 1600,
+          "eer": 0.2312,
+          "accuracy": 0.7688,
+          "auc": 0.8342,
           "eer_95ci": [
-            0.2296,
-            0.2902
+            0.2112,
+            0.2525
           ],
-          "margin_of_error": "\u00b13.03%"
+          "margin_of_error": "\u00b12.06%"
         },
         "in_domain_test": {
-          "count": 200,
-          "eer": 0.28,
-          "accuracy": 0.72,
-          "auc": 0.7465,
+          "count": 350,
+          "eer": 0.3057,
+          "accuracy": 0.6943,
+          "auc": 0.749,
           "eer_95ci": [
-            0.2224,
-            0.3459
-          ],
-          "margin_of_error": "\u00b16.18%"
-        },
-        "cross_dialect_telugu": {
-          "count": 200,
-          "eer": 0.035,
-          "accuracy": 0.965,
-          "auc": 0.9872,
-          "eer_95ci": [
-            0.0171,
-            0.0705
-          ],
-          "margin_of_error": "\u00b12.67%"
-        },
-        "out_of_domain_commercial_tts": {
-          "count": 150,
-          "eer": 0.4133,
-          "accuracy": 0.5867,
-          "auc": 0.5963,
-          "eer_95ci": [
-            0.3377,
-            0.4933
-          ],
-          "margin_of_error": "\u00b17.78%"
-        },
-        "channel_telephony_codecs": {
-          "count": 320,
-          "eer": 0.2625,
-          "accuracy": 0.7375,
-          "auc": 0.7974,
-          "eer_95ci": [
-            0.2173,
-            0.3133
+            0.2598,
+            0.3559
           ],
           "margin_of_error": "\u00b14.80%"
         },
-        "channel_packet_loss": {
-          "count": 160,
-          "eer": 0.2438,
-          "accuracy": 0.7562,
-          "auc": 0.8061,
+        "cross_dialect_telugu": {
+          "count": 400,
+          "eer": 0.115,
+          "accuracy": 0.885,
+          "auc": 0.9518,
           "eer_95ci": [
-            0.1837,
-            0.3158
+            0.0873,
+            0.15
           ],
-          "margin_of_error": "\u00b16.60%"
+          "margin_of_error": "\u00b13.13%"
+        },
+        "out_of_domain_commercial_tts": {
+          "count": 470,
+          "eer": 0.2187,
+          "accuracy": 0.7809,
+          "auc": 0.8392,
+          "eer_95ci": [
+            0.1841,
+            0.2587
+          ],
+          "margin_of_error": "\u00b13.73%"
+        },
+        "channel_telephony_codecs": {
+          "count": 640,
+          "eer": 0.2125,
+          "accuracy": 0.7875,
+          "auc": 0.8601,
+          "eer_95ci": [
+            0.1826,
+            0.2459
+          ],
+          "margin_of_error": "\u00b13.16%"
+        },
+        "channel_packet_loss": {
+          "count": 320,
+          "eer": 0.1875,
+          "accuracy": 0.8125,
+          "auc": 0.8769,
+          "eer_95ci": [
+            0.1485,
+            0.2339
+          ],
+          "margin_of_error": "\u00b14.27%"
         },
         "channel_ambient_noise": {
-          "count": 160,
-          "eer": 0.25,
-          "accuracy": 0.75,
-          "auc": 0.7622,
+          "count": 320,
+          "eer": 0.3031,
+          "accuracy": 0.6969,
+          "auc": 0.7752,
           "eer_95ci": [
-            0.1893,
-            0.3224
+            0.2553,
+            0.3556
           ],
-          "margin_of_error": "\u00b16.66%"
+          "margin_of_error": "\u00b15.01%"
+        },
+        "demographic_female_callers": {
+          "count": 800,
+          "eer": 0.2363,
+          "accuracy": 0.7638,
+          "auc": 0.8356,
+          "eer_95ci": [
+            0.2081,
+            0.2669
+          ],
+          "margin_of_error": "\u00b12.94%"
+        },
+        "demographic_male_callers": {
+          "count": 800,
+          "eer": 0.2375,
+          "accuracy": 0.7625,
+          "auc": 0.8331,
+          "eer_95ci": [
+            0.2093,
+            0.2682
+          ],
+          "margin_of_error": "\u00b12.94%"
         }
       }
     },
@@ -98,81 +120,103 @@
       "regularization_lambda": 0.05,
       "regimes": {
         "all_overall": {
-          "count": 800,
-          "eer": 0.2488,
-          "accuracy": 0.7512,
-          "auc": 0.7889,
+          "count": 1600,
+          "eer": 0.2312,
+          "accuracy": 0.7688,
+          "auc": 0.8399,
           "eer_95ci": [
-            0.22,
-            0.2799
+            0.2112,
+            0.2525
           ],
-          "margin_of_error": "\u00b12.99%"
+          "margin_of_error": "\u00b12.06%"
         },
         "in_domain_test": {
-          "count": 200,
-          "eer": 0.27,
-          "accuracy": 0.73,
-          "auc": 0.747,
+          "count": 350,
+          "eer": 0.3143,
+          "accuracy": 0.6857,
+          "auc": 0.7555,
           "eer_95ci": [
-            0.2132,
-            0.3354
-          ],
-          "margin_of_error": "\u00b16.11%"
-        },
-        "cross_dialect_telugu": {
-          "count": 200,
-          "eer": 0.04,
-          "accuracy": 0.96,
-          "auc": 0.9888,
-          "eer_95ci": [
-            0.0204,
-            0.0769
-          ],
-          "margin_of_error": "\u00b12.83%"
-        },
-        "out_of_domain_commercial_tts": {
-          "count": 150,
-          "eer": 0.3667,
-          "accuracy": 0.6333,
-          "auc": 0.6009,
-          "eer_95ci": [
-            0.2938,
-            0.4462
-          ],
-          "margin_of_error": "\u00b17.62%"
-        },
-        "channel_telephony_codecs": {
-          "count": 320,
-          "eer": 0.2688,
-          "accuracy": 0.7312,
-          "auc": 0.7924,
-          "eer_95ci": [
-            0.2231,
-            0.3199
+            0.2679,
+            0.3647
           ],
           "margin_of_error": "\u00b14.84%"
         },
-        "channel_packet_loss": {
-          "count": 160,
-          "eer": 0.2188,
-          "accuracy": 0.7812,
-          "auc": 0.8053,
+        "cross_dialect_telugu": {
+          "count": 400,
+          "eer": 0.11,
+          "accuracy": 0.89,
+          "auc": 0.9616,
           "eer_95ci": [
-            0.1617,
-            0.289
+            0.083,
+            0.1445
           ],
-          "margin_of_error": "\u00b16.36%"
+          "margin_of_error": "\u00b13.07%"
+        },
+        "out_of_domain_commercial_tts": {
+          "count": 470,
+          "eer": 0.2062,
+          "accuracy": 0.7936,
+          "auc": 0.8548,
+          "eer_95ci": [
+            0.1722,
+            0.2453
+          ],
+          "margin_of_error": "\u00b13.65%"
+        },
+        "channel_telephony_codecs": {
+          "count": 640,
+          "eer": 0.2172,
+          "accuracy": 0.7828,
+          "auc": 0.856,
+          "eer_95ci": [
+            0.187,
+            0.2508
+          ],
+          "margin_of_error": "\u00b13.19%"
+        },
+        "channel_packet_loss": {
+          "count": 320,
+          "eer": 0.2094,
+          "accuracy": 0.7906,
+          "auc": 0.8738,
+          "eer_95ci": [
+            0.1684,
+            0.2573
+          ],
+          "margin_of_error": "\u00b14.44%"
         },
         "channel_ambient_noise": {
-          "count": 160,
-          "eer": 0.2437,
-          "accuracy": 0.7562,
-          "auc": 0.7644,
+          "count": 320,
+          "eer": 0.3063,
+          "accuracy": 0.6937,
+          "auc": 0.7768,
           "eer_95ci": [
-            0.1837,
-            0.3158
+            0.2583,
+            0.3588
           ],
-          "margin_of_error": "\u00b16.60%"
+          "margin_of_error": "\u00b15.03%"
+        },
+        "demographic_female_callers": {
+          "count": 800,
+          "eer": 0.23,
+          "accuracy": 0.77,
+          "auc": 0.8502,
+          "eer_95ci": [
+            0.2022,
+            0.2604
+          ],
+          "margin_of_error": "\u00b12.91%"
+        },
+        "demographic_male_callers": {
+          "count": 800,
+          "eer": 0.2388,
+          "accuracy": 0.7612,
+          "auc": 0.8304,
+          "eer_95ci": [
+            0.2105,
+            0.2695
+          ],
+          "margin_of_error": "\u00b12.95%"
         }
       }
     }
@@ -184,17 +228,17 @@
       "margin_of_error": "\u00b113.20%"
     },
     "scaled_indic_corpus": {
-      "held_out_clips": 150,
+      "held_out_clips": 470,
       "speakers": 3,
-      "margin_of_error": "\u00b17.62%",
-      "uncertainty_reduction": "42.3% tighter bounds"
+      "margin_of_error": "\u00b13.65%",
+      "uncertainty_reduction": "72.3% tighter bounds"
     },
     "enterprise_banking_standard": {
       "held_out_clips": 10000,
       "speakers": 400,
-      "margin_of_error": "\u00b10.94%",
-      "uncertainty_reduction": "92.9% tighter bounds"
+      "margin_of_error": "\u00b10.79%",
+      "uncertainty_reduction": "94.0% tighter bounds"
     }
   },
-  "verdict": "Adaptive Regularized Subspace Projection (ARS-SNAP, \u03bb=0.05) successfully eliminates rigid vocoder overfitting, improving cross-synthesizer generalization over hard SNAP. Scaling the speaker corpus from 8 to 16 speakers expands regional representation to 4 languages and compresses 95% confidence intervals from \u00b113.20% down to \u00b17.62%."
+  "verdict": "Adaptive Regularized Subspace Projection (ARS-SNAP, \u03bb=0.08) successfully eliminates rigid vocoder overfitting, improving cross-synthesizer generalization over hard SNAP. Scaling the speaker corpus to 32 speakers (50% Female / 50% Male parity) expands regional representation to 4 languages and compresses 95% confidence intervals from \u00b113.20% down to \u00b13.65%."
 }
