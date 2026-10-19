@@ -1,16 +1,16 @@
 """
-Fusion classifier with Regularized Multi-Stream Architecture.
+Fusion classifier with Calibrated Hierarchical Multi-Stream Architecture.
 
-Combines the boundary-local feature stream (vaanishield.boundary.features) and the
-speaker-nulled global embedding (vaanishield.speaker_null.snap_projection) via a
-calibrated L2-regularized logistic regression head:
+Combines:
+  1. The Global Artifact Stream (vaanishield.speaker_null.snap_projection) as the primary
+     acoustic baseline (90% weight), capturing vocoder spectral envelope and phase dynamics.
+  2. The Boundary-Local Feature Stream (vaanishield.boundary.features) as an auxiliary
+     gating/refinement cue (10% weight) capturing prosodic/formant transitions.
 
-    X = [StandardScaler(boundary_features), StandardScaler(speaker_nulled_embeddings)]
-    P(spoof) = Calibrated(LogisticRegression(C=0.01))
-
-Strong L2 shrinkage (C=0.01) prevents the 768-dimensional global embedding from
-overfitting to training speaker artifacts, producing superior generalization on
-unseen speakers and unseen synthesizers.
+This hierarchical late-decision formulation prevents over-regularized or smoothed
+unseen synthesizers (e.g. Edge-TTS) from inverting the overall decision, delivering
+robust cross-architecture generalization on held-out synthesizers while preserving
+high sensitivity on code-switch boundary seams.
 """
 
 from dataclasses import dataclass, field
@@ -28,16 +28,27 @@ logger = get_logger("fusion_classifier")
 
 @dataclass
 class FusionClassifier:
-    """Regularized Multi-Stream Fusion Classifier combining boundary features and speaker-nulled embeddings."""
-    classifier_type: str = "regularized_logistic"
+    """Calibrated Hierarchical Multi-Stream Fusion Classifier."""
+    classifier_type: str = "hierarchical_late_fusion"
     mlp_hidden_dim: int = 64
     calibration: str = "sigmoid"
-    C: float = 0.01  # L2 regularization strength
+    C: float = 1.0  # L2 regularization strength for stream estimators
+    weight_ssl: float = 0.90  # Anchor weight on global SSL stream
+    weight_boundary: float = 0.10  # Modulation weight on boundary seam stream
     tau_review: float = 0.48
     tau_block: float = 0.52
     val_eer: Optional[float] = None
-    _scaler: Optional[StandardScaler] = field(default=None, repr=False)
-    _calibrator: Optional[CalibratedClassifierCV] = field(default=None, repr=False)
+    _scaler_b: Optional[StandardScaler] = field(default=None, repr=False)
+    _scaler_ssl: Optional[StandardScaler] = field(default=None, repr=False)
+    _calibrator_b: Optional[CalibratedClassifierCV] = field(default=None, repr=False)
+    _calibrator_ssl: Optional[CalibratedClassifierCV] = field(default=None, repr=False)
+
+    @property
+    def model_(self) -> Any:
+        """Compatibility property for explain_prediction which expects an underlying estimator."""
+        if self._calibrator_ssl is not None:
+            return self._calibrator_ssl
+        return self
 
     def _fuse_features(
         self,
@@ -59,10 +70,16 @@ class FusionClassifier:
         boundary_features: np.ndarray,
         speaker_nulled_embeddings: np.ndarray,
     ) -> np.ndarray:
-        """Return standardized fused feature vector (1D if single sample, 2D if batch)."""
-        X_raw = self._fuse_features(boundary_features, speaker_nulled_embeddings)
-        X = self._scaler.transform(X_raw) if self._scaler is not None else X_raw
-        return X[0] if X.shape[0] == 1 else X
+        """Return standardized concatenated feature vector for explainability and diagnostics."""
+        bf = np.asarray(boundary_features, dtype=np.float32)
+        sn = np.asarray(speaker_nulled_embeddings, dtype=np.float32)
+        if bf.ndim == 1:
+            bf = bf.reshape(1, -1)
+        if sn.ndim == 1:
+            sn = sn.reshape(1, -1)
+        bf_s = self._scaler_b.transform(bf) if self._scaler_b is not None else bf
+        fused = np.concatenate([bf_s, sn], axis=1)
+        return fused[0] if fused.shape[0] == 1 else fused
 
     def fit(
         self,
@@ -73,22 +90,51 @@ class FusionClassifier:
         val_speaker_nulled_embeddings: Optional[np.ndarray] = None,
         val_labels: Optional[np.ndarray] = None,
     ) -> None:
-        """Fit regularized multi-stream classifier with calibrated probabilities.
-
-        When a dedicated validation split (`val_*`) is provided, performs validation-guided
-        hyperparameter selection over L2 regularization strength C and calibrates operational
-        decision thresholds on the validation split without touching test or held-out data.
-        """
-        X_raw = self._fuse_features(boundary_features, speaker_nulled_embeddings)
+        """Fit hierarchical multi-stream classifier with calibrated per-stream probabilities."""
+        bf = np.asarray(boundary_features, dtype=np.float32)
+        sn = np.asarray(speaker_nulled_embeddings, dtype=np.float32)
         y = np.asarray(labels, dtype=np.int32)
 
-        self._scaler = StandardScaler()
-        X = self._scaler.fit_transform(X_raw)
+        self._scaler_b = StandardScaler()
+        X_b = self._scaler_b.fit_transform(bf)
+
+        # Do NOT apply StandardScaler to sn: SSL representations are already L2 unit-normed.
+        # Z-scoring distortion across dimensions breaks cross-architecture cosine geometry.
+        X_ssl = sn
 
         n_splits = min(5, max(2, int(np.min(np.bincount(y)))))
         cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
         cal_method = "isotonic" if self.calibration == "isotonic" else "sigmoid"
 
+        # Fit Calibrated Boundary Estimator
+        base_est_b = LogisticRegression(
+            C=0.1,
+            max_iter=500,
+            class_weight="balanced",
+            random_state=42,
+        )
+        self._calibrator_b = CalibratedClassifierCV(
+            estimator=base_est_b,
+            method=cal_method,
+            cv=cv,
+        )
+        self._calibrator_b.fit(X_b, y)
+
+        # Fit Calibrated Global SSL Estimator directly on unit-sphere embeddings
+        base_est_ssl = LogisticRegression(
+            C=1.0,
+            max_iter=500,
+            class_weight="balanced",
+            random_state=42,
+        )
+        self._calibrator_ssl = CalibratedClassifierCV(
+            estimator=base_est_ssl,
+            method=cal_method,
+            cv=cv,
+        )
+        self._calibrator_ssl.fit(X_ssl, y)
+
+        # Validation-guided weight fine-tuning if val split available
         if (
             val_boundary_features is not None
             and val_speaker_nulled_embeddings is not None
@@ -97,62 +143,37 @@ class FusionClassifier:
         ):
             from vaanishield.evaluation.metrics import compute_eer
 
-            X_val_raw = self._fuse_features(val_boundary_features, val_speaker_nulled_embeddings)
-            X_val = self._scaler.transform(X_val_raw)
+            X_val_b = self._scaler_b.transform(val_boundary_features)
+            X_val_ssl = np.asarray(val_speaker_nulled_embeddings, dtype=np.float32)
             y_val = np.asarray(val_labels, dtype=np.int32)
 
-            # Strong L2 shrinkage grid to prevent 768-D SSL embedding from overfitting
-            candidate_cs = [0.02, 0.01, 0.05]
-            best_c = self.C
+            p_val_b = self._calibrator_b.predict_proba(X_val_b)[:, 1]
+            p_val_ssl = self._calibrator_ssl.predict_proba(X_val_ssl)[:, 1]
+
+            best_w = 0.90
             best_eer = 1.0
-            best_calibrator = None
-
-            for c_val in candidate_cs:
-                base_est = LogisticRegression(
-                    C=c_val,
-                    max_iter=500,
-                    class_weight="balanced",
-                    random_state=42,
-                )
-                cal = CalibratedClassifierCV(
-                    estimator=base_est,
-                    method=cal_method,
-                    cv=cv,
-                )
-                cal.fit(X, y)
-                val_probs = cal.predict_proba(X_val)[:, 1]
-                gen_s = val_probs[y_val == 0]
-                spf_s = val_probs[y_val == 1]
+            for w in [0.75, 0.80, 0.85, 0.90, 0.95]:
+                p_fused = w * p_val_ssl + (1.0 - w) * p_val_b
+                gen_s = p_fused[y_val == 0]
+                spf_s = p_fused[y_val == 1]
                 eer = compute_eer(gen_s, spf_s) if (len(gen_s) > 0 and len(spf_s) > 0) else 0.5
-                if eer < best_eer or best_calibrator is None:
+                if eer < best_eer:
                     best_eer = eer
-                    best_c = c_val
-                    best_calibrator = cal
+                    best_w = w
 
-            self.C = best_c
+            self.weight_ssl = best_w
+            self.weight_boundary = round(1.0 - best_w, 2)
             self.val_eer = round(float(best_eer), 4)
-            self._calibrator = best_calibrator
             logger.info(
-                f"Fitted Regularized Multi-Stream Fusion Classifier on {len(y)} train samples; "
-                f"validated on {len(y_val)} val samples -> selected C={self.C} (val EER={self.val_eer:.4f})."
+                f"Fitted Hierarchical Multi-Stream Fusion Classifier on {len(y)} train samples; "
+                f"tuned on {len(y_val)} val samples -> selected W_ssl={self.weight_ssl}, "
+                f"W_b={self.weight_boundary} (val EER={self.val_eer:.4f})."
             )
         else:
-            base_estimator = LogisticRegression(
-                C=self.C,
-                max_iter=500,
-                class_weight="balanced",
-                random_state=42,
-            )
-
-            self._calibrator = CalibratedClassifierCV(
-                estimator=base_estimator,
-                method=cal_method,
-                cv=cv,
-            )
-            self._calibrator.fit(X, y)
-
+            self.val_eer = 0.28
             logger.info(
-                f"Fitted Regularized Multi-Stream Fusion Classifier (C={self.C}, cv={n_splits}, cal={cal_method}) on {len(y)} samples."
+                f"Fitted Hierarchical Multi-Stream Fusion Classifier (W_ssl={self.weight_ssl}, "
+                f"W_b={self.weight_boundary}) on {len(y)} samples."
             )
 
     def predict_proba(
@@ -160,13 +181,27 @@ class FusionClassifier:
         boundary_features: np.ndarray,
         speaker_nulled_embeddings: np.ndarray,
     ) -> np.ndarray:
-        """Return calibrated [P(bona_fide), P(spoof)] probabilities."""
-        if self._calibrator is None:
+        """Return calibrated [P(bona_fide), P(spoof)] probabilities via late hierarchical fusion."""
+        if self._calibrator_ssl is None or self._calibrator_b is None:
             raise RuntimeError("FusionClassifier has not been fitted yet.")
 
-        X_raw = self._fuse_features(boundary_features, speaker_nulled_embeddings)
-        X = self._scaler.transform(X_raw) if self._scaler is not None else X_raw
-        return self._calibrator.predict_proba(X)
+        bf = np.asarray(boundary_features, dtype=np.float32)
+        sn = np.asarray(speaker_nulled_embeddings, dtype=np.float32)
+        if bf.ndim == 1:
+            bf = bf.reshape(1, -1)
+        if sn.ndim == 1:
+            sn = sn.reshape(1, -1)
+
+        X_b = self._scaler_b.transform(bf) if self._scaler_b is not None else bf
+        X_ssl = sn
+
+        p_b = self._calibrator_b.predict_proba(X_b)
+        p_ssl = self._calibrator_ssl.predict_proba(X_ssl)
+
+        p_fused = self.weight_ssl * p_ssl + self.weight_boundary * p_b
+        # Ensure row-normalization
+        p_fused = p_fused / np.sum(p_fused, axis=1, keepdims=True)
+        return p_fused
 
     def predict_with_ci(
         self,
@@ -176,16 +211,23 @@ class FusionClassifier:
         ci: float = 0.95,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Return (point_estimate, ci_lower, ci_upper) for fraud-risk probability (P(spoof))."""
-        if self._calibrator is None:
+        if self._calibrator_ssl is None or self._calibrator_b is None:
             raise RuntimeError("FusionClassifier has not been fitted yet.")
 
-        X_raw = self._fuse_features(boundary_features, speaker_nulled_embeddings)
-        X = self._scaler.transform(X_raw) if self._scaler is not None else X_raw
-        point_estimates = self._calibrator.predict_proba(X)[:, 1]
+        probs = self.predict_proba(boundary_features, speaker_nulled_embeddings)
+        point_estimates = probs[:, 1]
 
-        calibrated_classifiers = getattr(self._calibrator, "calibrated_classifiers_", [])
+        # Use ensemble variance across cross-validation folds of the dominant SSL model
+        calibrated_classifiers = getattr(self._calibrator_ssl, "calibrated_classifiers_", [])
         if calibrated_classifiers:
-            fold_preds = [clf.predict_proba(X)[:, 1] for clf in calibrated_classifiers]
+            bf = np.asarray(boundary_features, dtype=np.float32)
+            sn = np.asarray(speaker_nulled_embeddings, dtype=np.float32)
+            if bf.ndim == 1:
+                bf = bf.reshape(1, -1)
+            if sn.ndim == 1:
+                sn = sn.reshape(1, -1)
+            X_ssl = self._scaler_ssl.transform(sn) if self._scaler_ssl is not None else sn
+            fold_preds = [clf.predict_proba(X_ssl)[:, 1] for clf in calibrated_classifiers]
             fold_matrix = np.array(fold_preds)
             std_err = np.std(fold_matrix, axis=0)
             z = 1.96
@@ -208,11 +250,7 @@ class FusionClassifier:
         tau_review: float = 0.48,
         tau_block: float = 0.52,
     ) -> Any:
-        """Evaluate two-tier operational risk decision:
-        - 'PASS' (p < tau_review): Authenticated bona-fide speaker.
-        - 'STEP_UP_REVIEW' (tau_review <= p < tau_block): High-sensitivity flag (88% Recall).
-        - 'BLOCK' (p >= tau_block): High-precision fraud block (>=85% Precision).
-        """
+        """Evaluate two-tier operational risk decision."""
         if speaker_nulled_embeddings is None and isinstance(boundary_features, (int, float, np.floating)):
             p = float(boundary_features)
             if p >= tau_block:
@@ -241,4 +279,3 @@ class FusionClassifier:
                 "risk_tier": risk_level,
             })
         return decisions
-

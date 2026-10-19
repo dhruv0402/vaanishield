@@ -98,36 +98,33 @@ class SpeakerNullingProjector:
             logger.error(f"Failed to load audio for embedding: {audio_path}: {e}")
             return np.zeros(self.embedding_dim, dtype=np.float32)
 
-        # Multi-scale Cepstral Mean Normalized (CMN) temporal modulation representation (768-dim)
-        # Subtracting the utterance-level mean spectrum (CMN) removes static channel EQ
-        # and static speaker vocal-tract offsets before SNAP orthogonal subspace projection.
+        # Multi-resolution representation capturing SSL speech pooling properties
         n_fft = 512
         hop = 160
-        mel = librosa.feature.melspectrogram(y=y, sr=sr, n_fft=n_fft, hop_length=hop, n_mels=128, fmin=60.0, fmax=7600.0)
+        mel = librosa.feature.melspectrogram(y=y, sr=sr, n_fft=n_fft, hop_length=hop, n_mels=128)
         log_mel = librosa.power_to_db(mel)
-        cmn_mel = log_mel - np.mean(log_mel, axis=1, keepdims=True)
-        d1_mel = librosa.feature.delta(cmn_mel)
-        d2_mel = librosa.feature.delta(cmn_mel, order=2)
 
+        # 128 mean + 128 std + 128 max + 128 min = 512
         stats = np.concatenate([
-            np.std(cmn_mel, axis=1),
-            np.percentile(cmn_mel, 90, axis=1) - np.percentile(cmn_mel, 10, axis=1),
-            np.std(d1_mel, axis=1),
-            np.std(d2_mel, axis=1),
-        ])  # 512
+            np.mean(log_mel, axis=1),
+            np.std(log_mel, axis=1),
+            np.max(log_mel, axis=1),
+            np.min(log_mel, axis=1),
+        ])
 
-        mfcc = librosa.feature.mfcc(S=log_mel, n_mfcc=64)
-        cmn_mfcc = mfcc - np.mean(mfcc, axis=1, keepdims=True)
-        delta = librosa.feature.delta(cmn_mfcc)
-        delta2 = librosa.feature.delta(cmn_mfcc, order=2)
+        # Add 128 mfcc + 128 delta stats = 256 -> Total 768 dimensions
+        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=64, hop_length=hop)
         mfcc_stats = np.concatenate([
-            np.std(cmn_mfcc, axis=1),
-            np.percentile(cmn_mfcc, 85, axis=1) - np.percentile(cmn_mfcc, 15, axis=1),
+            np.mean(mfcc, axis=1),
+            np.std(mfcc, axis=1),
+        ])
+        delta = librosa.feature.delta(mfcc)
+        delta_stats = np.concatenate([
+            np.mean(delta, axis=1),
             np.std(delta, axis=1),
-            np.std(delta2, axis=1),
-        ])  # 256
+        ])
 
-        emb = np.concatenate([stats, mfcc_stats])[:self.embedding_dim]
+        emb = np.concatenate([stats, mfcc_stats, delta_stats])[:self.embedding_dim]
         if len(emb) < self.embedding_dim:
             emb = np.pad(emb, (0, self.embedding_dim - len(emb)))
 
