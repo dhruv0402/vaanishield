@@ -22,7 +22,7 @@ librosa's built-in pitch estimation.
 """
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any, Union
 import numpy as np
 import parselmouth
 import librosa
@@ -125,16 +125,18 @@ def extract_energy_discontinuity(audio_window: np.ndarray, sr: int) -> float:
     pre_win = audio_window[:mid]
     post_win = audio_window[mid:]
 
-    # Estimate background noise floor from lowest 10th percentile energy frames
+    # Estimate background noise floor from lowest 10th percentile energy frames via vectorization
     frame_len = max(16, int(0.01 * sr))
-    frame_energies = [
-        np.mean(audio_window[i : i + frame_len] ** 2)
-        for i in range(0, len(audio_window) - frame_len, frame_len)
-    ]
-    noise_floor = float(np.percentile(frame_energies, 10)) if frame_energies else 1e-9
+    n_frames = len(audio_window) // frame_len
+    if n_frames > 0:
+        frames = audio_window[: n_frames * frame_len].reshape(n_frames, frame_len)
+        frame_energies = np.mean(frames ** 2, axis=1)
+        noise_floor = float(np.percentile(frame_energies, 10))
+    else:
+        noise_floor = 1e-9
 
-    rms_pre = np.sqrt(max(1e-9, np.mean(pre_win ** 2) - noise_floor))
-    rms_post = np.sqrt(max(1e-9, np.mean(post_win ** 2) - noise_floor))
+    rms_pre = np.sqrt(max(1e-9, float(np.mean(pre_win ** 2)) - noise_floor))
+    rms_post = np.sqrt(max(1e-9, float(np.mean(post_win ** 2)) - noise_floor))
 
     # Relative log energy difference across the boundary compensated for ambient noise
     energy_jump = float(abs(np.log(rms_post) - np.log(rms_pre)))
@@ -207,15 +209,24 @@ def extract_mfcc_delta_magnitude(audio_window: np.ndarray, sr: int) -> float:
 
 
 def extract_boundary_features(
-    audio_path: str,
-    codeswitch_points: List[CodeSwitchPoint],
+    audio_input: Any = None,
+    codeswitch_points: List[CodeSwitchPoint] = None,
     speaker_baseline: Optional[dict] = None,
+    sr: int = 16000,
+    audio_path: Optional[str] = None,
 ) -> List[BoundaryFeatureVector]:
     """Run all 5 configured feature extractors for every detected boundary in an utterance."""
     if not codeswitch_points:
         return []
 
-    audio, sr = load_audio(audio_path, target_sr=16000)
+    src = audio_input if audio_input is not None else audio_path
+    if src is None:
+        return []
+
+    if isinstance(src, np.ndarray):
+        audio = src
+    else:
+        audio, sr = load_audio(str(src), target_sr=sr)
     total_samples = len(audio)
 
     vectors: List[BoundaryFeatureVector] = []

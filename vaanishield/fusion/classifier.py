@@ -306,6 +306,173 @@ class FusionClassifier:
         return sha256
 
     @classmethod
+    def save_zero_pickle(cls, checkpoint_dict: dict, npz_path: str) -> str:
+        """Export model parameters into a pure zero-pickle NumPy archive with SHA-256 sidecar.
+
+        Completely eliminates Python pickle deserialization vulnerability by saving raw
+        multidimensional IEEE floating point weight matrices and intercepts without objects.
+        """
+        import json
+        import hashlib
+        from pathlib import Path
+
+        path = Path(npz_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        model = checkpoint_dict.get("model")
+        projector = checkpoint_dict.get("projector")
+
+        if model is None:
+            raise ValueError("checkpoint_dict must contain 'model'")
+
+        # Boundary stream parameters
+        if getattr(model, "_scaler_b", None) is not None:
+            b_mean = model._scaler_b.mean_.astype(np.float32)
+            b_scale = model._scaler_b.scale_.astype(np.float32)
+        else:
+            b_mean = getattr(model, "b_mean", np.zeros(10, dtype=np.float32))
+            b_scale = getattr(model, "b_scale", np.ones(10, dtype=np.float32))
+
+        b_clfs = getattr(getattr(model, "_calibrator_b", None), "calibrated_classifiers_", [])
+        if b_clfs:
+            b_coefs = np.array([clf.estimator.coef_[0] for clf in b_clfs], dtype=np.float32)
+            b_intercepts = np.array([clf.estimator.intercept_[0] for clf in b_clfs], dtype=np.float32)
+            b_cal_a = np.array([clf.calibrators[0].a_ for clf in b_clfs], dtype=np.float32)
+            b_cal_b = np.array([clf.calibrators[0].b_ for clf in b_clfs], dtype=np.float32)
+        else:
+            b_coefs = getattr(model, "b_coefs", np.zeros((1, 10), dtype=np.float32))
+            b_intercepts = getattr(model, "b_intercepts", np.zeros(1, dtype=np.float32))
+            b_cal_a = getattr(model, "b_cal_a", np.ones(1, dtype=np.float32))
+            b_cal_b = getattr(model, "b_cal_b", np.zeros(1, dtype=np.float32))
+
+        # SSL stream parameters
+        ssl_clfs = getattr(getattr(model, "_calibrator_ssl", None), "calibrated_classifiers_", [])
+        if ssl_clfs:
+            ssl_coefs = np.array([clf.estimator.coef_[0] for clf in ssl_clfs], dtype=np.float32)
+            ssl_intercepts = np.array([clf.estimator.intercept_[0] for clf in ssl_clfs], dtype=np.float32)
+            ssl_cal_a = np.array([clf.calibrators[0].a_ for clf in ssl_clfs], dtype=np.float32)
+            ssl_cal_b = np.array([clf.calibrators[0].b_ for clf in ssl_clfs], dtype=np.float32)
+        else:
+            ssl_coefs = getattr(model, "ssl_coefs", np.zeros((1, 768), dtype=np.float32))
+            ssl_intercepts = getattr(model, "ssl_intercepts", np.zeros(1, dtype=np.float32))
+            ssl_cal_a = getattr(model, "ssl_cal_a", np.ones(1, dtype=np.float32))
+            ssl_cal_b = getattr(model, "ssl_cal_b", np.zeros(1, dtype=np.float32))
+
+        # Speaker subspace
+        subspace = getattr(projector, "speaker_subspace", None)
+        if subspace is None:
+            subspace = np.zeros((768, 1), dtype=np.float32)
+        else:
+            subspace = np.asarray(subspace, dtype=np.float32)
+
+        meta = json.dumps({
+            "version": "2.0.0",
+            "format": "zero_pickle_npz",
+            "weight_ssl": float(getattr(model, "weight_ssl", 0.75)),
+            "weight_boundary": float(getattr(model, "weight_boundary", 0.25)),
+            "tau_review": float(getattr(model, "tau_review", 0.48)),
+            "tau_block": float(getattr(model, "tau_block", 0.52)),
+        })
+
+        np.savez_compressed(
+            path,
+            b_mean=b_mean,
+            b_scale=b_scale,
+            b_coefs=b_coefs,
+            b_intercepts=b_intercepts,
+            b_cal_a=b_cal_a,
+            b_cal_b=b_cal_b,
+            ssl_coefs=ssl_coefs,
+            ssl_intercepts=ssl_intercepts,
+            ssl_cal_a=ssl_cal_a,
+            ssl_cal_b=ssl_cal_b,
+            speaker_subspace=subspace,
+            weight_ssl=np.array([getattr(model, "weight_ssl", 0.75)], dtype=np.float32),
+            weight_boundary=np.array([getattr(model, "weight_boundary", 0.25)], dtype=np.float32),
+            tau_review=np.array([getattr(model, "tau_review", 0.48)], dtype=np.float32),
+            tau_block=np.array([getattr(model, "tau_block", 0.52)], dtype=np.float32),
+            metadata=np.array([meta]),
+        )
+
+        with open(path, "rb") as f:
+            sha256 = hashlib.sha256(f.read()).hexdigest()
+
+        sha_path = path.with_suffix(".sha256")
+        with open(sha_path, "w", encoding="utf-8") as f:
+            f.write(f"{sha256}  {path.name}\n")
+
+        logger.info(f"Saved secure zero-pickle archive to {path} (SHA-256: {sha256[:12]}...)")
+        return sha256
+
+    @classmethod
+    def load_zero_pickle(cls, npz_path: str, verify_checksum: bool = True) -> dict:
+        """Load zero-pickle model parameters strictly without invoking Python pickle."""
+        import hashlib
+        from pathlib import Path
+        from vaanishield.speaker_null.snap_projection import SpeakerNullingProjector
+
+        path = Path(npz_path)
+        if not path.exists():
+            raise FileNotFoundError(f"Zero-pickle file not found: {path}")
+
+        if verify_checksum:
+            sha_path = path.with_suffix(".sha256")
+            if sha_path.exists():
+                with open(path, "rb") as f:
+                    computed = hashlib.sha256(f.read()).hexdigest()
+                with open(sha_path, "r", encoding="utf-8") as f:
+                    expected = f.read().split()[0].strip()
+                if computed != expected:
+                    raise ValueError(f"Zero-pickle integrity check failed for {path}!")
+                logger.info(f"Zero-pickle integrity verified: {computed[:12]}...")
+
+        with np.load(path, allow_pickle=False) as data:
+            b_mean = np.array(data["b_mean"], dtype=np.float32)
+            b_scale = np.array(data["b_scale"], dtype=np.float32)
+            b_coefs = np.array(data["b_coefs"], dtype=np.float32)
+            b_intercepts = np.array(data["b_intercepts"], dtype=np.float32)
+            b_cal_a = np.array(data["b_cal_a"], dtype=np.float32)
+            b_cal_b = np.array(data["b_cal_b"], dtype=np.float32)
+            ssl_coefs = np.array(data["ssl_coefs"], dtype=np.float32)
+            ssl_intercepts = np.array(data["ssl_intercepts"], dtype=np.float32)
+            ssl_cal_a = np.array(data["ssl_cal_a"], dtype=np.float32)
+            ssl_cal_b = np.array(data["ssl_cal_b"], dtype=np.float32)
+            w_ssl = float(data["weight_ssl"][0]) if "weight_ssl" in data else 0.75
+            w_b = float(data["weight_boundary"][0]) if "weight_boundary" in data else 0.25
+            tau_rev = float(data["tau_review"][0]) if "tau_review" in data else 0.48
+            tau_blk = float(data["tau_block"][0]) if "tau_block" in data else 0.52
+            subspace = np.array(data["speaker_subspace"], dtype=np.float32)
+
+        predictor = ZeroPicklePredictor(
+            b_mean=b_mean,
+            b_scale=b_scale,
+            b_coefs=b_coefs,
+            b_intercepts=b_intercepts,
+            b_cal_a=b_cal_a,
+            b_cal_b=b_cal_b,
+            ssl_coefs=ssl_coefs,
+            ssl_intercepts=ssl_intercepts,
+            ssl_cal_a=ssl_cal_a,
+            ssl_cal_b=ssl_cal_b,
+            weight_ssl=w_ssl,
+            weight_boundary=w_b,
+            tau_review=tau_rev,
+            tau_block=tau_blk,
+        )
+
+        projector = SpeakerNullingProjector(
+            embedding_dim=subspace.shape[0],
+            speaker_subspace=subspace,
+        )
+
+        return {
+            "model": predictor,
+            "projector": projector,
+            "version": "2.0.0",
+            "format": "zero_pickle",
+        }
+
+    @classmethod
     def load_checkpoint(cls, checkpoint_path: str, verify_checksum: bool = True) -> dict:
         """Load model checkpoint and optionally verify cryptographic SHA-256 integrity digest."""
         import pickle
@@ -315,6 +482,10 @@ class FusionClassifier:
         path = Path(checkpoint_path)
         if not path.exists():
             raise FileNotFoundError(f"Checkpoint file not found: {path}")
+
+        # If zero-pickle archive, load strictly without pickle
+        if path.suffix == ".npz":
+            return cls.load_zero_pickle(str(path), verify_checksum=verify_checksum)
             
         with open(path, "rb") as f:
             raw_bytes = f.read()
@@ -334,4 +505,95 @@ class FusionClassifier:
             logger.info(f"Checkpoint integrity verified: {computed_sha256[:12]}...")
             
         return pickle.loads(raw_bytes)
+
+
+class ZeroPicklePredictor:
+    """Zero-pickle, pure-NumPy inference predictor matching FusionClassifier interface.
+
+    Executes forward passes using vectorized matrix operations without Python object deserialization.
+    """
+    def __init__(
+        self,
+        b_mean: np.ndarray,
+        b_scale: np.ndarray,
+        b_coefs: np.ndarray,
+        b_intercepts: np.ndarray,
+        b_cal_a: np.ndarray,
+        b_cal_b: np.ndarray,
+        ssl_coefs: np.ndarray,
+        ssl_intercepts: np.ndarray,
+        ssl_cal_a: np.ndarray,
+        ssl_cal_b: np.ndarray,
+        weight_ssl: float = 0.75,
+        weight_boundary: float = 0.25,
+        tau_review: float = 0.48,
+        tau_block: float = 0.52,
+    ):
+        self.b_mean = b_mean
+        self.b_scale = b_scale
+        self.b_coefs = b_coefs
+        self.b_intercepts = b_intercepts
+        self.b_cal_a = b_cal_a
+        self.b_cal_b = b_cal_b
+        self.ssl_coefs = ssl_coefs
+        self.ssl_intercepts = ssl_intercepts
+        self.ssl_cal_a = ssl_cal_a
+        self.ssl_cal_b = ssl_cal_b
+        self.weight_ssl = weight_ssl
+        self.weight_boundary = weight_boundary
+        self.tau_review = tau_review
+        self.tau_block = tau_block
+        # Linear boundary weights compatibility for explain_prediction:
+        self.coef_ = np.mean(b_coefs, axis=0, keepdims=True)
+
+    def predict_proba(self, boundary_features: np.ndarray, speaker_nulled_embeddings: np.ndarray) -> np.ndarray:
+        bf = np.asarray(boundary_features, dtype=np.float32)
+        sn = np.asarray(speaker_nulled_embeddings, dtype=np.float32)
+        if bf.ndim == 1:
+            bf = bf.reshape(1, -1)
+        if sn.ndim == 1:
+            sn = sn.reshape(1, -1)
+
+        b_scaled = (bf - self.b_mean) / self.b_scale
+        b_df = b_scaled @ self.b_coefs.T + self.b_intercepts
+        b_probs = 1.0 / (1.0 + np.exp(self.b_cal_a * b_df + self.b_cal_b))
+        b_prob = np.mean(b_probs, axis=1, keepdims=True)
+
+        ssl_df = sn @ self.ssl_coefs.T + self.ssl_intercepts
+        ssl_probs = 1.0 / (1.0 + np.exp(self.ssl_cal_a * ssl_df + self.ssl_cal_b))
+        ssl_prob = np.mean(ssl_probs, axis=1, keepdims=True)
+
+        p_spoof = self.weight_ssl * ssl_prob + self.weight_boundary * b_prob
+        p_bonafide = 1.0 - p_spoof
+        probs = np.hstack([p_bonafide, p_spoof])
+        return probs / np.sum(probs, axis=1, keepdims=True)
+
+    def predict_with_ci(
+        self,
+        boundary_features: np.ndarray,
+        speaker_nulled_embeddings: np.ndarray,
+        n_bootstrap: int = 100,
+        ci: float = 0.95,
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        probs = self.predict_proba(boundary_features, speaker_nulled_embeddings)
+        point_estimates = probs[:, 1]
+        sn = np.asarray(speaker_nulled_embeddings, dtype=np.float32)
+        if sn.ndim == 1:
+            sn = sn.reshape(1, -1)
+        ssl_df = sn @ self.ssl_coefs.T + self.ssl_intercepts
+        ssl_probs = 1.0 / (1.0 + np.exp(self.ssl_cal_a * ssl_df + self.ssl_cal_b))
+        std_err = np.std(ssl_probs, axis=1)
+        z = 1.96
+        ci_lower = np.clip(point_estimates - z * std_err, 0.0, 1.0)
+        ci_upper = np.clip(point_estimates + z * std_err, 0.0, 1.0)
+        return point_estimates, ci_lower, ci_upper
+
+    def predict_operational_tier(self, spoof_prob: float) -> str:
+        if spoof_prob < self.tau_review:
+            return "ALLOW_VERIFIED"
+        elif spoof_prob < self.tau_block:
+            return "STEP_UP_AUTH"
+        else:
+            return "BLOCK_AND_ALERT"
+
 

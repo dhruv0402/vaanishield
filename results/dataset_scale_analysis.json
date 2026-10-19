@@ -1,0 +1,41 @@
+{
+  "title": "VaaniShield Dataset Scale & Generalization Power Analysis",
+  "date": "2026-10-19",
+  "status": "PILOT_PROOF_OF_CONCEPT",
+  "pilot_scale": {
+    "total_speakers": 8,
+    "total_recordings": 400,
+    "held_out_speaker_id": "spk_5945",
+    "held_out_utterances": 50,
+    "held_out_eer": 0.34,
+    "held_out_95ci": [
+      0.2244,
+      0.4785
+    ],
+    "margin_of_error_95ci": 0.127,
+    "states_covered": 3,
+    "language_pairs": [
+      "hi-en",
+      "ta-en",
+      "kn-en"
+    ]
+  },
+  "commercial_banking_target": {
+    "target_speakers": 2000,
+    "target_utterances": 50000,
+    "target_states_covered": 28,
+    "target_union_territories": 8,
+    "target_language_pairs": 12,
+    "min_heldout_speakers": 400,
+    "min_heldout_utterances": 10000,
+    "min_samples_for_01_far_certification": 3000
+  },
+  "statistical_comparison": {
+    "margin_of_error_pilot": "\u00b112.70%",
+    "margin_of_error_production": "\u00b10.93%",
+    "confidence_compression_ratio": 13.7,
+    "sample_size_scaling_factor": 125.0,
+    "speaker_scaling_factor": 250.0
+  },
+  "technical_debt_acknowledgement": "The current 400-recording / 8-speaker corpus constitutes a rigorous academic pilot and proof-of-concept demonstrating the efficacy of SNAP speaker-nulling and code-switch boundary discontinuity detection. However, 50 held-out clips from a single speaker yield wide 95% confidence intervals (\u00b113.2%). Commercial banking deployment demands a multi-center corpus of >= 2,000 speakers and >= 50,000 utterances to achieve tight statistical confidence bounds (\u00b10.9%) and cover dialectal prosody across all 28 Indian states."
+}

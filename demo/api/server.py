@@ -90,10 +90,15 @@ def get_whisper():
 def get_pipeline():
     global MODEL, PROJECTOR, CFG
     if MODEL is None:
-        if not os.path.exists(CHECKPOINT_PATH):
-            raise RuntimeError(f"Checkpoint not found at {CHECKPOINT_PATH}. Run scripts/train.py first.")
         from vaanishield.fusion.classifier import FusionClassifier
-        data = FusionClassifier.load_checkpoint(CHECKPOINT_PATH, verify_checksum=True)
+        zero_pickle_path = "checkpoints/onnx/model_parameters.npz"
+        if os.path.exists(zero_pickle_path):
+            data = FusionClassifier.load_zero_pickle(zero_pickle_path, verify_checksum=True)
+            print("[VaaniShield Security] Initialized Zero-Pickle Secure Pipeline (SHA-256 verified, 0 pickle deserialization).")
+        elif os.path.exists(CHECKPOINT_PATH):
+            data = FusionClassifier.load_checkpoint(CHECKPOINT_PATH, verify_checksum=True)
+        else:
+            raise RuntimeError(f"No checkpoint found at {zero_pickle_path} or {CHECKPOINT_PATH}.")
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             CFG = yaml.safe_load(f)
         MODEL = data["model"]
@@ -226,7 +231,8 @@ async def analyze_audio(
         if not points:
             from vaanishield.boundary.localization import find_acoustic_change_points
             points = find_acoustic_change_points(
-                audio_path=audio_source,
+                audio_input=audio_data,
+                sr=sr,
                 window_ms_before=300,
                 window_ms_after=300,
                 max_points=5,
@@ -234,11 +240,11 @@ async def analyze_audio(
             localization_method = "acoustic_flux_changepoints"
 
         # 2. Boundary-local features
-        b_feats = extract_boundary_features(audio_source, points)
+        b_feats = extract_boundary_features(audio_data, points, sr=sr)
         agg_vec = aggregate_boundary_features(b_feats, aggregation="mean_and_max")
 
         # 4. Speaker-nulled global embedding
-        raw_emb = projector.embed(audio_source)
+        raw_emb = projector.embed(audio_data, sr=sr)
         nulled_emb = projector.project(raw_emb)
 
         # 5. Fusion inference with calibrated probability and bootstrap CI

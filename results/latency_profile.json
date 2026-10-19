@@ -1,0 +1,79 @@
+{
+  "timestamp": "2026-10-19",
+  "sample_files_tested": 5,
+  "total_evaluations": 75,
+  "summary": {
+    "audio_io_disk_ms": {
+      "median_ms": 1.251,
+      "mean_ms": 1.376,
+      "p95_ms": 2.514,
+      "p99_ms": 3.671,
+      "min_ms": 0.771,
+      "max_ms": 4.429
+    },
+    "changepoint_localization_ms": {
+      "median_ms": 5.627,
+      "mean_ms": 6.422,
+      "p95_ms": 11.061,
+      "p99_ms": 18.112,
+      "min_ms": 2.773,
+      "max_ms": 27.612
+    },
+    "boundary_feature_extraction_ms": {
+      "median_ms": 46.993,
+      "mean_ms": 48.62,
+      "p95_ms": 60.415,
+      "p99_ms": 103.014,
+      "min_ms": 32.378,
+      "max_ms": 143.303
+    },
+    "snap_embedding_ms": {
+      "median_ms": 18.177,
+      "mean_ms": 19.303,
+      "p95_ms": 27.687,
+      "p99_ms": 42.212,
+      "min_ms": 11.364,
+      "max_ms": 46.893
+    },
+    "snap_projection_ms": {
+      "median_ms": 0.038,
+      "mean_ms": 0.061,
+      "p95_ms": 0.05,
+      "p99_ms": 0.722,
+      "min_ms": 0.034,
+      "max_ms": 1.201
+    },
+    "onnx_inference_e2e_ms": {
+      "median_ms": 0.138,
+      "mean_ms": 0.173,
+      "p95_ms": 0.184,
+      "p99_ms": 1.314,
+      "min_ms": 0.094,
+      "max_ms": 1.43
+    },
+    "zeropickle_inference_ms": {
+      "median_ms": 0.093,
+      "mean_ms": 0.093,
+      "p95_ms": 0.111,
+      "p99_ms": 0.133,
+      "min_ms": 0.071,
+      "max_ms": 0.152
+    },
+    "full_pipeline_optimized_ms": {
+      "median_ms": 73.211,
+      "mean_ms": 76.108,
+      "p95_ms": 110.4,
+      "p99_ms": 141.865,
+      "min_ms": 49.746,
+      "max_ms": 144.03
+    }
+  },
+  "key_findings": {
+    "onnx_inference_latency_ms": 0.138,
+    "full_pipeline_latency_median_ms": 73.211,
+    "full_pipeline_latency_p95_ms": 110.4,
+    "full_pipeline_latency_p99_ms": 141.865,
+    "telephony_streaming_budget_ms": 200.0,
+    "meets_telephony_realtime_budget": true
+  }
+}

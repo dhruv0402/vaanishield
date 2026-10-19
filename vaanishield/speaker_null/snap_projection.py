@@ -19,7 +19,7 @@ Mathematical formulation:
 """
 
 from dataclasses import dataclass
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Any, Union
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LogisticRegression
@@ -90,12 +90,15 @@ class SpeakerNullingProjector:
             f"(explained variance ratio sum: {float(np.sum(pca.explained_variance_ratio_)):.4f})."
         )
 
-    def embed(self, audio_path: str, sr: int = 16000) -> np.ndarray:
+    def embed(self, audio_input: Any, sr: int = 16000) -> np.ndarray:
         """Extract pooled utterance-level representation before projection."""
         try:
-            y, sr = load_audio(audio_path, target_sr=sr)
+            if isinstance(audio_input, np.ndarray):
+                y = audio_input
+            else:
+                y, sr = load_audio(str(audio_input), target_sr=sr)
         except Exception as e:
-            logger.error(f"Failed to load audio for embedding: {audio_path}: {e}")
+            logger.error(f"Failed to load audio for embedding: {audio_input}: {e}")
             return np.zeros(self.embedding_dim, dtype=np.float32)
 
         # Multi-resolution representation capturing SSL speech pooling properties

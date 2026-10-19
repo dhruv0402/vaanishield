@@ -19,7 +19,7 @@ Whisper-derived fallback and both should be supported for different environments
 import os
 import re
 from dataclasses import dataclass
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Union, Any
 import numpy as np
 
 from vaanishield.utils.audio_io import load_audio
@@ -230,10 +230,12 @@ def align_tokens_to_audio(
 
 
 def find_acoustic_change_points(
-    audio_path: str,
+    audio_input: Optional[Union[str, np.ndarray]] = None,
+    sr: int = 16000,
     window_ms_before: int = 300,
     window_ms_after: int = 300,
     max_points: int = 5,
+    audio_path: Optional[str] = None,
 ) -> List[CodeSwitchPoint]:
     """Detect unsupervised acoustic change points directly from raw waveform.
 
@@ -243,7 +245,14 @@ def find_acoustic_change_points(
     """
     import librosa
 
-    audio, sr = load_audio(audio_path)
+    src = audio_input if audio_input is not None else audio_path
+    if src is None:
+        return []
+
+    if isinstance(src, np.ndarray):
+        audio = src
+    else:
+        audio, sr = load_audio(str(src), target_sr=sr)
     total_duration = len(audio) / sr
     if total_duration < 0.4:
         return []
