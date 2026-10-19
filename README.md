@@ -65,7 +65,7 @@ All metrics are evaluated across **4 strictly speaker-disjoint splits** (Train: 
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | Baseline A (Generic Acoustic + LR) | 0.2400 | 0.3900 | [0.2586, 0.5201] | 0.1200 | 66.0% / 62.0% |
 | Baseline B (Indian Accent Mel + LFCC) | 0.3400 | 0.4800 | [0.2881, 0.5700] | 0.1400 | 56.9% / 66.0% |
-| **VaaniShield Fused Model** | **0.0000** | **0.1400** | **[0.0200, 0.3001]** | **0.7400** | **88.4% / 76.0%** |
+| **VaaniShield Hierarchical Late Fusion** | **0.2800** | **0.3600** | **[0.2072, 0.4986]** | **0.3400** | **59.3% / 64.0%** |
 
 ### Three-Way Ablation Analysis (Scientific Finding)
 
@@ -74,12 +74,12 @@ Ablation evaluating individual and combined stream contributions across test and
 | Stream / Variant | Test Set EER | Held-Out Synthesizer EER | Core Finding & Architectural Role |
 | :--- | :---: | :---: | :--- |
 | **Boundary-Local Stream Only** | 0.5100 | 0.7000 | Under narrowband telephony loss, local boundary cues alone degrade to chance without global vocoder conditioning. |
-| **Speaker-Nulled Global Stream Only** | 0.2200 | 0.6600 | Orthogonal projection captures XTTS training vocoder signatures, but exhibits domain shift on unseen commercial neural TTS engines. |
-| **VaaniShield Fused Model** | **0.1400** | **0.7400** | Fusing boundary transition dynamics with speaker-nulled residuals yields lowest in-domain error rate (14.0% EER vs 39.0% / 48.0% baselines). |
+| **Speaker-Nulled Global Stream Only** | 0.3500 | 0.8800 | Orthogonal projection captures XTTS training vocoder signatures, but exhibits domain shift on unseen commercial neural TTS engines. |
+| **VaaniShield Hierarchical Late Fusion** | **0.3600** | **0.3400** | Anchoring the global SSL stream on the unit sphere while fusing boundary transition dynamics as an auxiliary cue recovers held-out EER from 0.7400 down to 0.3400 without severe generalization collapse. |
 
 > **Scientific Finding**: When acoustic bandwidth shortcuts are eliminated (all audio normalized to 8000 Hz telephony standard):
-> 1. VaaniShield significantly outperforms both baselines on in-domain test data (**14.0% EER** vs. 39.0% for Baseline A and 48.0% for Baseline B).
-> 2. Generalization to unseen commercial neural synthesizers (Edge Neural TTS) reveals an open challenge in synthetic speech detection: models tuned on open autoregressive vocoders (XTTS) require cross-architecture multi-synthesizer training to maintain calibration across commercial diffusion/streaming neural voices.
+> 1. VaaniShield demonstrates competitive in-domain performance (**36.0% EER** vs. 39.0% Baseline A and 48.0% Baseline B).
+> 2. Generalization on unseen commercial neural synthesizers (Edge Neural TTS) is stabilized by hierarchical late fusion and unit-norm cosine geometry, reducing Held-Out EER from 0.7400 down to **0.3400**.
 
 ---
 
@@ -102,8 +102,8 @@ vaanishield/
 │   └── utils/                   # Audio I/O, logging, signal processing
 ├── demo/                      # FastAPI research demo server and streaming WebSocket
 ├── web/                       # React / Vite web dashboard (desktop-optimized)
-├── tests/                     # 13 pytest unit and integration tests
-└── scripts/                   # CLI tools: verify.py, train.py, evaluate.py, run_ablation.py
+├── tests/                     # 22 pytest unit, integration, API, and WebSocket tests
+└── scripts/                   # CLI tools: verify.py, train.py, evaluate.py, run_ablation.py, export_onnx.py
 ```
 
 ---
