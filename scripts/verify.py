@@ -274,7 +274,7 @@ def run_verification(
             spoof_by_sys[sys_name] = spoof_by_sys.get(sys_name, 0) + 1
 
     print("\n" + "=" * 70)
-    print("ALL 8 ACCEPTANCE GATE CHECKS PASSED SUCCESSFULLY!")
+    print("ALL 9 ACCEPTANCE GATE CHECKS PASSED SUCCESSFULLY!")
     print("=" * 70)
     print(f"n_speakers: {n_speakers}")
     print(f"n_unique_sentences: {unique_sentences}")

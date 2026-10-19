@@ -46,29 +46,25 @@ class BoundaryFeatureVector:
 
 
 def denoise_audio_window(audio_window: np.ndarray, sr: int, reduction_factor: float = 0.75) -> np.ndarray:
-    """Apply SNR-adaptive spectral subtraction & Wiener filtering to stabilize boundary prosodic features.
+    """Apply spectral subtraction noise reduction to stabilize boundary prosodic features.
 
-    Suppresses stationary ambient noise (e.g. call-center background chatter, street noise)
-    while preserving delicate speech harmonics and formant transitions essential for boundary seam scoring.
+    Subtracts stationary background noise floor estimated from minimum magnitude
+    frames, preventing pitch tracking failures in noisy telecom conditions while
+    preserving speech harmonics.
     """
     if len(audio_window) < int(0.04 * sr):
         return audio_window
 
     try:
         n_fft = min(512, len(audio_window))
-        hop_length = max(16, n_fft // 4)
+        hop_length = n_fft // 4
         stft = librosa.stft(audio_window, n_fft=n_fft, hop_length=hop_length)
         mag, phase = np.abs(stft), np.angle(stft)
 
         # Estimate stationary noise profile from bottom 15th percentile energy frames
         noise_profile = np.percentile(mag, 15, axis=1, keepdims=True)
-        # Compute a posteriori SNR estimate per bin
-        snr_post = np.maximum(1e-3, (mag ** 2) / np.maximum(1e-6, noise_profile ** 2))
-        # Wiener gain filter: G = SNR / (1 + SNR)
-        wiener_gain = snr_post / (1.0 + snr_post)
-        wiener_gain = np.clip(wiener_gain, 0.1, 1.0)
+        cleaned_mag = np.maximum(mag - reduction_factor * noise_profile, 0.05 * mag)
 
-        cleaned_mag = mag * wiener_gain
         cleaned_stft = cleaned_mag * np.exp(1j * phase)
         cleaned_audio = librosa.istft(cleaned_stft, hop_length=hop_length, length=len(audio_window))
         return cleaned_audio.astype(np.float32)

@@ -13,7 +13,37 @@ from fastapi.responses import JSONResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import time
-import audioop
+
+# Precomputed standard ITU-T G.711 mu-law linear expansion lookup table (256 16-bit PCM values)
+# Enables zero-dependency mu-law decoding in Python 3.10+ without the deprecated audioop module
+G711_ULAW_DECODE_TABLE = np.array([
+    -32124, -31100, -30076, -29052, -28028, -27004, -25980, -24956, -23932, -22908,
+    -21884, -20860, -19836, -18812, -17788, -16764, -15996, -15484, -14972, -14460,
+    -13948, -13436, -12924, -12412, -11900, -11388, -10876, -10364, -9852, -9340,
+    -8828, -8316, -7932, -7676, -7420, -7164, -6908, -6652, -6396, -6140,
+    -5884, -5628, -5372, -5116, -4860, -4604, -4348, -4092, -3900, -3772,
+    -3644, -3516, -3388, -3260, -3132, -3004, -2876, -2748, -2620, -2492,
+    -2364, -2236, -2108, -1980, -1884, -1820, -1756, -1692, -1628, -1564,
+    -1500, -1436, -1372, -1308, -1244, -1180, -1116, -1052, -988, -924,
+    -876, -844, -812, -780, -748, -716, -684, -652, -620, -588,
+    -556, -524, -492, -460, -428, -396, -372, -356, -340, -324,
+    -308, -292, -276, -260, -244, -228, -212, -196, -180, -164,
+    -148, -132, -120, -112, -104, -96, -88, -80, -72, -64,
+    -56, -48, -40, -32, -24, -16, -8, 0, 32124, 31100,
+    30076, 29052, 28028, 27004, 25980, 24956, 23932, 22908, 21884, 20860,
+    19836, 18812, 17788, 16764, 15996, 15484, 14972, 14460, 13948, 13436,
+    12924, 12412, 11900, 11388, 10876, 10364, 9852, 9340, 8828, 8316,
+    7932, 7676, 7420, 7164, 6908, 6652, 6396, 6140, 5884, 5628,
+    5372, 5116, 4860, 4604, 4348, 4092, 3900, 3772, 3644, 3516,
+    3388, 3260, 3132, 3004, 2876, 2748, 2620, 2492, 2364, 2236,
+    2108, 1980, 1884, 1820, 1756, 1692, 1628, 1564, 1500, 1436,
+    1372, 1308, 1244, 1180, 1116, 1052, 988, 924, 876, 844,
+    812, 780, 748, 716, 684, 652, 620, 588, 556, 524,
+    492, 460, 428, 396, 372, 356, 340, 324, 308, 292,
+    276, 260, 244, 228, 212, 196, 180, 164, 148, 132,
+    120, 112, 104, 96, 88, 80, 72, 64, 56, 48,
+    40, 32, 24, 16, 8, 0
+], dtype=np.int16)
 
 from vaanishield.boundary.localization import find_codeswitch_points, CodeSwitchPoint
 from vaanishield.boundary.features import extract_boundary_features, aggregate_boundary_features
@@ -363,6 +393,16 @@ async def dispatch_policy_webhook(req: PolicyWebhookRequest):
     }
 
     if req.target_webhook_url:
+        import urllib.parse
+        parsed = urllib.parse.urlparse(req.target_webhook_url)
+        if parsed.scheme not in ("http", "https"):
+            raise HTTPException(status_code=400, detail="Invalid webhook URL scheme: must be http or https.")
+        
+        # Prevent SSRF to cloud metadata endpoints (e.g. AWS 169.254.169.254)
+        hostname = (parsed.hostname or "").lower()
+        if hostname in ("169.254.169.254", "metadata.google.internal", "metadata"):
+            raise HTTPException(status_code=403, detail="Dispatch to cloud metadata service is strictly forbidden.")
+
         try:
             req_data = json.dumps(payload).encode("utf-8")
             url_req = urllib.request.Request(
@@ -398,14 +438,49 @@ async def websocket_stream_analyze(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive()
+            new_chunk = None
+
             if "bytes" in data and data["bytes"]:
                 chunk_bytes = data["bytes"]
                 try:
-                    chunk = np.frombuffer(chunk_bytes, dtype=np.float32)
+                    new_chunk = np.frombuffer(chunk_bytes, dtype=np.float32)
                 except Exception:
-                    chunk = np.frombuffer(chunk_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+                    new_chunk = np.frombuffer(chunk_bytes, dtype=np.int16).astype(np.float32) / 32768.0
 
-                buffer = np.concatenate([buffer, chunk])
+            elif "text" in data:
+                text_msg = data["text"]
+                if text_msg == "RESET":
+                    buffer = np.zeros(0, dtype=np.float32)
+                    chunk_count = 0
+                    await websocket.send_json({"type": "reset_ack"})
+                    continue
+                else:
+                    # Support Twilio Media Stream / SIP trunk JSON protocol
+                    try:
+                        msg_obj = json.loads(text_msg)
+                        event = msg_obj.get("event")
+                        if event == "start":
+                            buffer = np.zeros(0, dtype=np.float32)
+                            chunk_count = 0
+                            await websocket.send_json({"type": "sip_start_ack", "streamSid": msg_obj.get("streamSid")})
+                            continue
+                        elif event == "media":
+                            media_payload = msg_obj.get("media", {}).get("payload")
+                            if media_payload:
+                                import base64
+                                raw_mulaw = base64.b64decode(media_payload)
+                                # Zero-dependency ITU-T G.711 mu-law decoding via table lookup
+                                u_idx = np.frombuffer(raw_mulaw, dtype=np.uint8)
+                                decoded_pcm = G711_ULAW_DECODE_TABLE[u_idx]
+                                new_chunk = decoded_pcm.astype(np.float32) / 32768.0
+                        elif event == "stop":
+                            await websocket.send_json({"type": "sip_stop_ack", "final_chunks": chunk_count})
+                            continue
+                    except Exception:
+                        pass
+
+            if new_chunk is not None and len(new_chunk) > 0:
+                buffer = np.concatenate([buffer, new_chunk])
                 chunk_count += 1
 
                 # Keep rolling buffer of last 5.0 seconds
@@ -454,36 +529,6 @@ async def websocket_stream_analyze(websocket: WebSocket):
                     finally:
                         if os.path.exists(tmp_chunk_path):
                             os.remove(tmp_chunk_path)
-
-            elif "text" in data:
-                text_msg = data["text"]
-                if text_msg == "RESET":
-                    buffer = np.zeros(0, dtype=np.float32)
-                    chunk_count = 0
-                    await websocket.send_json({"type": "reset_ack"})
-                else:
-                    # Support Twilio Media Stream / SIP trunk JSON protocol
-                    try:
-                        msg_obj = json.loads(text_msg)
-                        event = msg_obj.get("event")
-                        if event == "start":
-                            buffer = np.zeros(0, dtype=np.float32)
-                            chunk_count = 0
-                            await websocket.send_json({"type": "sip_start_ack", "streamSid": msg_obj.get("streamSid")})
-                        elif event == "media":
-                            media_payload = msg_obj.get("media", {}).get("payload")
-                            if media_payload:
-                                import base64
-                                raw_mulaw = base64.b64decode(media_payload)
-                                # Decode standard 8kHz G.711 mu-law telephony samples
-                                pcm_chunk = audioop.ulaw2lin(raw_mulaw, 2)
-                                chunk = np.frombuffer(pcm_chunk, dtype=np.int16).astype(np.float32) / 32768.0
-                                buffer = np.concatenate([buffer, chunk])
-                                chunk_count += 1
-                        elif event == "stop":
-                            await websocket.send_json({"type": "sip_stop_ack", "final_chunks": chunk_count})
-                    except Exception:
-                        pass
 
     except WebSocketDisconnect:
         pass

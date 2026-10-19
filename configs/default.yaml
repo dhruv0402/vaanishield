@@ -40,7 +40,7 @@ fusion:
   calibration: "sigmoid"              # smooth Platt scaling for continuous probabilities + CI
 
 dataset_construction:
-  cloning_systems_train: ["xtts", "piper", "mms_tts"]
+  cloning_systems_train: ["xtts"]
   cloning_systems_heldout: ["xtts_heldout"]     # excluded from training — generalization test
   noise_augmentations:
     - "codec_compression"

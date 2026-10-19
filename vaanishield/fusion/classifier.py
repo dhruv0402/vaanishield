@@ -263,14 +263,14 @@ class FusionClassifier:
         decisions = []
         for p, low, high in zip(probs, ci_lower, ci_upper):
             if p >= tau_block:
-                action = "BLOCK"
+                action = "BLOCK_AND_ALERT"
                 risk_level = "CRITICAL"
             elif p >= tau_review:
-                action = "STEP_UP_REVIEW"
-                risk_level = "SUSPICIOUS"
+                action = "STEP_UP_AUTH"
+                risk_level = "ELEVATED"
             else:
-                action = "PASS"
-                risk_level = "LOW"
+                action = "ALLOW_VERIFIED"
+                risk_level = "SECURE"
 
             decisions.append({
                 "spoof_probability": float(round(p, 4)),

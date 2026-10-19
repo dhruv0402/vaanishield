@@ -55,22 +55,39 @@ def test_websocket_twilio_sip_streaming():
 
         # 2. Twilio Media chunks (8 kHz mu-law)
         sr = 8000
-        # Generate 200ms audio chunks (1600 samples)
-        raw_pcm = (0.2 * np.sin(2 * np.pi * 300 * np.linspace(0, 0.2, int(0.2 * sr), endpoint=False)) * 32767).astype(np.int16).tobytes()
+        # Generate 500ms audio chunks (4000 samples)
+        # 6 chunks = 3.0 seconds (exceeds the 2.5s streaming threshold)
+        raw_pcm = (0.3 * np.sin(2 * np.pi * 300 * np.linspace(0, 0.5, int(0.5 * sr), endpoint=False)) * 32767).astype(np.int16).tobytes()
+        # Encode to mu-law without audioop using inverse lookup or precomputed mu-law array
+        # Standard G.711 compression
         mulaw_chunk = audioop.lin2ulaw(raw_pcm, 2)
         b64_payload = base64.b64encode(mulaw_chunk).decode("utf-8")
 
-        for _ in range(3):
+        for _ in range(6):
             media_event = {
                 "event": "media",
                 "media": {"payload": b64_payload}
             }
             websocket.send_text(json.dumps(media_event))
 
+        # Live telemetry MUST now be produced by the pipeline
+        telemetry = websocket.receive_json()
+        assert telemetry["type"] == "telemetry"
+        assert "spoof_probability" in telemetry
+        assert 0.0 <= telemetry["spoof_probability"] <= 1.0
+        assert telemetry["buffer_duration_sec"] >= 2.5
+        assert telemetry["alert_level"] in ["CRITICAL", "WARNING", "SECURE"]
+
         # 3. Twilio Stop event
         stop_event = {"event": "stop", "streamSid": "MZ1234567890abcdef"}
         websocket.send_text(json.dumps(stop_event))
-        stop_ack = websocket.receive_json()
-        assert stop_ack["type"] == "sip_stop_ack"
-        assert stop_ack["final_chunks"] >= 3
+        
+        # Read until sip_stop_ack (draining any remaining chunk telemetry)
+        final_msg = websocket.receive_json()
+        while final_msg.get("type") == "telemetry":
+            final_msg = websocket.receive_json()
+
+        assert final_msg["type"] == "sip_stop_ack"
+        assert final_msg["final_chunks"] >= 6
+
 

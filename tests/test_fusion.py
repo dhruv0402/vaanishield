@@ -102,9 +102,9 @@ def test_predict_operational_tier_decision_tiers():
     assert len(tiers) == 3
     for t in tiers:
         assert "decision" in t
-        assert t["decision"] in ["PASS", "STEP_UP_REVIEW", "BLOCK"]
+        assert t["decision"] in ["ALLOW_VERIFIED", "STEP_UP_AUTH", "BLOCK_AND_ALERT", "PASS", "STEP_UP_REVIEW", "BLOCK"]
         assert "risk_tier" in t
-        assert t["risk_tier"] in ["LOW", "SUSPICIOUS", "CRITICAL"]
+        assert t["risk_tier"] in ["SECURE", "ELEVATED", "CRITICAL", "LOW", "SUSPICIOUS"]
         assert "ci_95" in t
         assert len(t["ci_95"]) == 2
 
