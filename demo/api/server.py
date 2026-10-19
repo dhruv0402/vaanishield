@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import time
+import audioop
 
 from vaanishield.boundary.localization import find_codeswitch_points, CodeSwitchPoint
 from vaanishield.boundary.features import extract_boundary_features, aggregate_boundary_features
@@ -460,6 +461,29 @@ async def websocket_stream_analyze(websocket: WebSocket):
                     buffer = np.zeros(0, dtype=np.float32)
                     chunk_count = 0
                     await websocket.send_json({"type": "reset_ack"})
+                else:
+                    # Support Twilio Media Stream / SIP trunk JSON protocol
+                    try:
+                        msg_obj = json.loads(text_msg)
+                        event = msg_obj.get("event")
+                        if event == "start":
+                            buffer = np.zeros(0, dtype=np.float32)
+                            chunk_count = 0
+                            await websocket.send_json({"type": "sip_start_ack", "streamSid": msg_obj.get("streamSid")})
+                        elif event == "media":
+                            media_payload = msg_obj.get("media", {}).get("payload")
+                            if media_payload:
+                                import base64
+                                raw_mulaw = base64.b64decode(media_payload)
+                                # Decode standard 8kHz G.711 mu-law telephony samples
+                                pcm_chunk = audioop.ulaw2lin(raw_mulaw, 2)
+                                chunk = np.frombuffer(pcm_chunk, dtype=np.int16).astype(np.float32) / 32768.0
+                                buffer = np.concatenate([buffer, chunk])
+                                chunk_count += 1
+                        elif event == "stop":
+                            await websocket.send_json({"type": "sip_stop_ack", "final_chunks": chunk_count})
+                    except Exception:
+                        pass
 
     except WebSocketDisconnect:
         pass
