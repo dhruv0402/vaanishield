@@ -96,6 +96,10 @@ class VaaniShieldONNXEngine:
                     self.tau_block = float(data["tau_block"][0])
                 if "speaker_subspace" in data:
                     self.speaker_subspace = np.array(data["speaker_subspace"], dtype=np.float32)
+                if "singular_values" in data:
+                    self.singular_values = np.array(data["singular_values"], dtype=np.float32)
+                else:
+                    self.singular_values = None
 
     def predict_proba(
         self,

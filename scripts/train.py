@@ -128,6 +128,18 @@ def train(
                 "model_type": model_type,
             }, f)
 
+        # Write SHA-256 integrity sidecar
+        import hashlib
+        with open(saved_checkpoint_path, "rb") as f:
+            sha256 = hashlib.sha256(f.read()).hexdigest()
+        with open(Path(saved_checkpoint_path).with_suffix(".sha256"), "w") as f:
+            f.write(f"{sha256}  {Path(saved_checkpoint_path).name}\n")
+
+        # Export zero-pickle container
+        npz_target = Path("checkpoints/onnx/model_parameters.npz")
+        if npz_target.parent.exists():
+            FusionClassifier.save_parameters_npz(model, projector, str(npz_target))
+
     else:
         raise ValueError(f"Unknown model_type: {model_type}. Choose from 'fusion', 'baseline_a', 'baseline_b'")
 

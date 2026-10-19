@@ -358,12 +358,18 @@ class FusionClassifier:
             ssl_cal_a = getattr(model, "ssl_cal_a", np.ones(1, dtype=np.float32))
             ssl_cal_b = getattr(model, "ssl_cal_b", np.zeros(1, dtype=np.float32))
 
-        # Speaker subspace
+        # Speaker subspace & singular values for ARS-SNAP
         subspace = getattr(projector, "speaker_subspace", None)
         if subspace is None:
             subspace = np.zeros((768, 1), dtype=np.float32)
         else:
             subspace = np.asarray(subspace, dtype=np.float32)
+
+        s_vals = getattr(projector, "singular_values", None)
+        if s_vals is None:
+            s_vals = np.ones(subspace.shape[1], dtype=np.float32)
+        else:
+            s_vals = np.asarray(s_vals, dtype=np.float32)
 
         meta = json.dumps({
             "version": "2.0.0",
@@ -387,6 +393,7 @@ class FusionClassifier:
             ssl_cal_a=ssl_cal_a,
             ssl_cal_b=ssl_cal_b,
             speaker_subspace=subspace,
+            singular_values=s_vals,
             weight_ssl=np.array([getattr(model, "weight_ssl", 0.75)], dtype=np.float32),
             weight_boundary=np.array([getattr(model, "weight_boundary", 0.25)], dtype=np.float32),
             tau_review=np.array([getattr(model, "tau_review", 0.48)], dtype=np.float32),
@@ -442,6 +449,7 @@ class FusionClassifier:
             tau_rev = float(data["tau_review"][0]) if "tau_review" in data else 0.48
             tau_blk = float(data["tau_block"][0]) if "tau_block" in data else 0.52
             subspace = np.array(data["speaker_subspace"], dtype=np.float32)
+            s_vals = np.array(data["singular_values"], dtype=np.float32) if "singular_values" in data else None
 
         predictor = ZeroPicklePredictor(
             b_mean=b_mean,
@@ -463,6 +471,7 @@ class FusionClassifier:
         projector = SpeakerNullingProjector(
             embedding_dim=subspace.shape[0],
             speaker_subspace=subspace,
+            singular_values=s_vals,
         )
 
         return {

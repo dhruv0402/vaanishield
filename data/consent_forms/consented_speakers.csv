@@ -1,9 +1,17 @@
 speaker_id,speaker_name,corpus_source,consent_status,source_license,regional_language
-spk_2131,OpenSLR 103 Contributor 2131,OpenSLR 103 Hindi,public_academic_license,OpenSLR 103 Public Academic License,hi
 spk_1119,OpenSLR 103 Contributor 1119,OpenSLR 103 Hindi,public_academic_license,OpenSLR 103 Public Academic License,hi
-spk_5945,OpenSLR 103 Contributor 5945,OpenSLR 103 Hindi,public_academic_license,OpenSLR 103 Public Academic License,hi
+spk_2131,OpenSLR 103 Contributor 2131,OpenSLR 103 Hindi,public_academic_license,OpenSLR 103 Public Academic License,hi
 spk_3701,OpenSLR 103 Contributor 3701,OpenSLR 103 Hindi,public_academic_license,OpenSLR 103 Public Academic License,hi
+spk_5945,OpenSLR 103 Contributor 5945,OpenSLR 103 Hindi,public_academic_license,OpenSLR 103 Public Academic License,hi
 spk_ta_01,OpenSLR 65 Tamil Contributor 00023,OpenSLR 65 Tamil,public_academic_license,CC BY-SA 4.0,ta
 spk_ta_02,OpenSLR 65 Tamil Contributor 00929,OpenSLR 65 Tamil,public_academic_license,CC BY-SA 4.0,ta
+spk_ta_03,OpenSLR 65 Tamil Contributor 00535,OpenSLR 65 Tamil,public_academic_license,CC BY-SA 4.0,ta
+spk_ta_04,OpenSLR 65 Tamil Contributor 01181,OpenSLR 65 Tamil,public_academic_license,CC BY-SA 4.0,ta
 spk_kn_01,OpenSLR 79 Kannada Contributor 00180,OpenSLR 79 Kannada,public_academic_license,CC BY-SA 4.0,kn
 spk_kn_02,OpenSLR 79 Kannada Contributor 00271,OpenSLR 79 Kannada,public_academic_license,CC BY-SA 4.0,kn
+spk_kn_03,OpenSLR 79 Kannada Contributor 00378,OpenSLR 79 Kannada,public_academic_license,CC BY-SA 4.0,kn
+spk_kn_04,OpenSLR 79 Kannada Contributor 00417,OpenSLR 79 Kannada,public_academic_license,CC BY-SA 4.0,kn
+spk_te_01,OpenSLR 66 Telugu Contributor 00113,OpenSLR 66 Telugu,public_academic_license,CC BY-SA 4.0,te
+spk_te_02,OpenSLR 66 Telugu Contributor 00682,OpenSLR 66 Telugu,public_academic_license,CC BY-SA 4.0,te
+spk_te_03,OpenSLR 66 Telugu Contributor 00974,OpenSLR 66 Telugu,public_academic_license,CC BY-SA 4.0,te
+spk_te_04,OpenSLR 66 Telugu Contributor 02477,OpenSLR 66 Telugu,public_academic_license,CC BY-SA 4.0,te

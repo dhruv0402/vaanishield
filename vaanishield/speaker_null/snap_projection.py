@@ -38,10 +38,15 @@ class SpeakerNullingProjector:
 
     Suppresses the speaker-identity subspace from speech representations to eliminate
     speaker entanglement and isolate synthesis/cloning artifact residuals.
+    Supports Adaptive Regularized Subspace Projection (ARS-SNAP) via Tikhonov soft-shrinkage
+    to prevent over-nulling on out-of-domain commercial synthesizers and unseen speakers.
     """
     ssl_backbone: str = "microsoft/wavlm-base-plus"
     embedding_dim: int = 768
     speaker_subspace: Optional[np.ndarray] = None  # Matrix U of shape (dim, k) with orthonormal columns
+    singular_values: Optional[np.ndarray] = None  # Singular values s of shape (k,)
+    explained_variance_ratio: Optional[np.ndarray] = None
+    default_regularization: float = 0.05
 
     def fit_speaker_subspace(
         self,
@@ -85,10 +90,35 @@ class SpeakerNullingProjector:
 
         # components_ has shape (k, dim) -> transpose to (dim, k)
         self.speaker_subspace = pca.components_.T.astype(np.float32)
+        self.singular_values = pca.singular_values_.astype(np.float32)
+        self.explained_variance_ratio = pca.explained_variance_ratio_.astype(np.float32)
         logger.info(
             f"Fitted speaker subspace with {k} components across {n_pts} speaker points "
             f"(explained variance ratio sum: {float(np.sum(pca.explained_variance_ratio_)):.4f})."
         )
+
+    def get_effective_subspace(self, regularization: Optional[float] = None) -> np.ndarray:
+        """Compute the regularized subspace projection matrix U_eff with Tikhonov shrinkage.
+
+        Mathematical formulation:
+            w_i = \\sigma_i^2 / (\\sigma_i^2 + \\lambda \\cdot \\sigma_0^2)
+            U_eff = U \\cdot \\text{diag}(\\sqrt{w_i})
+        Such that (e @ U_eff) @ U_eff^T = \\sum_{i} w_i (e \\cdot u_i) u_i.
+        When lambda == 0.0, w_i = 1 for all i (exact hard orthogonal nulling).
+        When lambda > 0.0, weaker singular components that overfit to training vocoders
+        are smoothly attenuated, protecting synthesis boundary cues on unseen speakers.
+        """
+        if self.speaker_subspace is None:
+            raise RuntimeError(
+                "Speaker subspace has not been fit. Call fit_speaker_subspace() before project()."
+            )
+        reg = self.default_regularization if regularization is None else float(regularization)
+        if reg > 0.0 and self.singular_values is not None and len(self.singular_values) > 0:
+            sigma_sq = self.singular_values ** 2
+            scale_ref = float(sigma_sq[0]) if sigma_sq[0] > 0 else 1.0
+            filter_weights = (sigma_sq / (sigma_sq + reg * scale_ref)).astype(np.float32)
+            return (self.speaker_subspace * np.sqrt(filter_weights)).astype(np.float32)
+        return self.speaker_subspace
 
     def embed(self, audio_input: Any, sr: int = 16000) -> np.ndarray:
         """Extract pooled utterance-level representation before projection."""
@@ -137,27 +167,22 @@ class SpeakerNullingProjector:
 
         return emb.astype(np.float32)
 
-    def project(self, embedding: np.ndarray) -> np.ndarray:
+    def project(self, embedding: np.ndarray, regularization: Optional[float] = None) -> np.ndarray:
         """Project embedding onto the orthogonal complement of the speaker subspace.
 
-        Formula: e_null = (I - U U^T) e = e - U (U^T e)
-        where U has orthonormal columns spanning the speaker subspace.
+        Formula: e_null = (I - U_eff U_eff^T) e = e - U_eff (U_eff^T e)
+        where U_eff is either the exact orthonormal basis (hard SNAP) or regularized
+        shrinkage basis (ARS-SNAP).
         """
-        if self.speaker_subspace is None:
-            raise RuntimeError(
-                "Speaker subspace has not been fit. Call fit_speaker_subspace() before project()."
-            )
-
+        U_eff = self.get_effective_subspace(regularization=regularization)
         emb = np.asarray(embedding, dtype=np.float32)
         if emb.ndim == 1:
-            # e - U @ (U.T @ e)
-            proj_on_subspace = self.speaker_subspace @ (self.speaker_subspace.T @ emb)
+            proj_on_subspace = U_eff @ (U_eff.T @ emb)
             residual = emb - proj_on_subspace
             norm = np.linalg.norm(residual)
             return (residual / norm if norm > 0 else residual).astype(np.float32)
         elif emb.ndim == 2:
-            # For batch (N, D): E - (E @ U) @ U.T
-            proj = (emb @ self.speaker_subspace) @ self.speaker_subspace.T
+            proj = (emb @ U_eff) @ U_eff.T
             residual = emb - proj
             norms = np.linalg.norm(residual, axis=1, keepdims=True)
             norms[norms == 0] = 1.0
@@ -165,9 +190,9 @@ class SpeakerNullingProjector:
         else:
             raise ValueError("Embedding must be 1D or 2D array.")
 
-    def embed_and_null(self, audio_path: str) -> np.ndarray:
+    def embed_and_null(self, audio_path: str, regularization: Optional[float] = None) -> np.ndarray:
         """Convenience helper: extract embedding and project onto speaker-null subspace."""
-        return self.project(self.embed(audio_path))
+        return self.project(self.embed(audio_path), regularization=regularization)
 
     @staticmethod
     def evaluate_speaker_probe(

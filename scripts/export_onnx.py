@@ -205,9 +205,16 @@ def export_and_benchmark(
 
     # 3. Export Pure Zero-Pickle NPZ Parameter Archive
     logger.info(f"Saving zero-pickle NumPy container to {npz_params_file}...")
+    s_vals = getattr(projector, "singular_values", None)
+    if s_vals is None:
+        s_vals = np.ones(speaker_subspace.shape[1], dtype=np.float32)
+    else:
+        s_vals = np.asarray(s_vals, dtype=np.float32)
+
     np.savez_compressed(
         npz_params_file,
         speaker_subspace=speaker_subspace,
+        singular_values=s_vals,
         b_mean=b_mean,
         b_scale=b_scale,
         b_coefs=b_coefs,
