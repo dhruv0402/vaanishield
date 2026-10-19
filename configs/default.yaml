@@ -30,7 +30,7 @@ boundary_features:
   aggregation: "mean_and_max"         # how per-boundary vectors combine to one per utterance
 
 speaker_null:
-  ssl_backbone: "microsoft/wavlm-base-plus"   # swap for wav2vec2-xlsr if preferred
+  embedding_extractor: "multires_mel_mfcc_stats"   # Multi-resolution log-mel + MFCC delta summary statistics (768-D)
   projection_method: "snap_orthogonal"
   embedding_dim: 768
 

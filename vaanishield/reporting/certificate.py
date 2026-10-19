@@ -1,6 +1,6 @@
 """
 VaaniShield Forensic Audit Certificate & Incident Report Generator.
-Compliant with RBI Cyber Security Framework, CERT-In advisory directives,
+Generates tamper-evident acoustic audit reports designed around banking cybersecurity
 and DPDPA 2023 Non-Semantic Privacy principles (Zero transcript leakage).
 """
 

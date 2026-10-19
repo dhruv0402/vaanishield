@@ -252,8 +252,8 @@ async def analyze_audio(
         ci_low_val = float(ci_low[0])
         ci_high_val = float(ci_high[0])
 
-        is_spoof = prob_val >= 0.5
         decision_action = model.predict_operational_tier(prob_val)
+        is_spoof = decision_action != "ALLOW_VERIFIED"
 
         if decision_action == "BLOCK_AND_ALERT":
             risk_level = "CRITICAL"

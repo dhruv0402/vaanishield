@@ -45,8 +45,10 @@ class FusionClassifier:
 
     @property
     def model_(self) -> Any:
-        """Compatibility property for explain_prediction which expects an underlying estimator."""
-        if self._calibrator_ssl is not None:
+        """Compatibility property for explain_prediction: returns the boundary estimator for seam feature attribution."""
+        if self._calibrator_b is not None:
+            return self._calibrator_b
+        elif self._calibrator_ssl is not None:
             return self._calibrator_ssl
         return self
 
