@@ -17,11 +17,10 @@ def test_generate_pdf_certificate():
         },
         "language_transitions": [
             {
-                "timestamp_seconds": 1.45,
-                "from_language": "hi",
-                "to_language": "en",
-                "cue": "Phase discontinuity & vocoder mismatch",
-                "anomaly_score": 0.88
+                "timestamp_sec": 1.45,
+                "language_transition": "HI -> EN",
+                "description": "Phase discontinuity & vocoder mismatch",
+                "contribution_score": 0.88
             }
         ]
     }

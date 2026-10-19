@@ -250,12 +250,16 @@ async def analyze_audio(
         step = max(1, len(audio_data) // 120)
         waveform_peaks = [float(abs(audio_data[i])) for i in range(0, len(audio_data), step)][:120]
 
+        # Cryptographic integrity digest of original audio
+        audio_sha256 = compute_sha256(audio_source)
+
         # Strictly non-semantic metadata returned: no spoken text or transcript stored/returned
         return {
             "status": "success",
             "is_spoof": is_spoof,
             "spoof_probability": prob_val,
             "confidence_interval_95": [ci_low_val, ci_high_val],
+            "audio_sha256": audio_sha256,
             "operational_decision": {
                 "decision": decision_action,
                 "risk_tier": risk_level,
@@ -267,6 +271,7 @@ async def analyze_audio(
             "audio_metadata": {
                 "duration_sec": round(duration_sec, 2),
                 "sample_rate_hz": sr,
+                "audio_sha256": audio_sha256,
                 "detected_boundary_count": len(points),
                 "localization_method": localization_method,
                 "language_pair": lang_pair,
@@ -337,7 +342,12 @@ class PolicyWebhookRequest(BaseModel):
 async def dispatch_policy_webhook(req: PolicyWebhookRequest):
     """
     Dispatches automated call control decisions to banking contact center / IVR webhooks.
+    If target_webhook_url is provided, performs an authenticated HTTP POST.
+    Otherwise, returns a simulated delivery payload.
     """
+    import urllib.request
+    import urllib.error
+
     # Policy routing rules
     action = "TERMINATE_CALL" if req.decision == "BLOCK_AND_ALERT" else (
         "STEP_UP_MFA" if req.decision == "STEP_UP_AUTH" else "ALLOW_CALL"
@@ -349,9 +359,30 @@ async def dispatch_policy_webhook(req: PolicyWebhookRequest):
         "decision": req.decision,
         "action": action,
         "spoof_probability": req.spoof_probability,
-        "status": "DISPATCHED_TO_IVR"
     }
-    return {"status": "success", "dispatched_payload": payload}
+
+    if req.target_webhook_url:
+        try:
+            req_data = json.dumps(payload).encode("utf-8")
+            url_req = urllib.request.Request(
+                req.target_webhook_url,
+                data=req_data,
+                headers={"Content-Type": "application/json", "User-Agent": "VaaniShield-Webhook-Dispatcher/2.0"},
+                method="POST"
+            )
+            with urllib.request.urlopen(url_req, timeout=5) as response:
+                status_code = response.getcode()
+                payload["delivery_status"] = f"DELIVERED_HTTP_{status_code}"
+                return {"status": "success", "mode": "network_dispatch", "http_status": status_code, "dispatched_payload": payload}
+        except Exception as e:
+            payload["delivery_status"] = f"DISPATCH_FAILED: {str(e)}"
+            return JSONResponse(
+                status_code=502,
+                content={"status": "error", "mode": "network_dispatch", "detail": str(e), "dispatched_payload": payload}
+            )
+    else:
+        payload["delivery_status"] = "SIMULATED_LOCAL_DISPATCH"
+        return {"status": "success", "mode": "simulation", "dispatched_payload": payload}
 
 
 @app.websocket("/ws/stream_analyze")

@@ -408,23 +408,28 @@ export default function App() {
         body: JSON.stringify({
           analysis_result: {
             ...analysisResult,
+            audio_sha256: analysisResult.audio_sha256 || analysisResult.audio_metadata?.audio_sha256,
             calibrated_p_spoof: analysisResult.spoof_probability,
             tier: analysisResult.operational_decision?.risk_tier || "SECURE",
             decision: analysisResult.operational_decision?.decision || "ALLOW_VERIFIED",
-            ci_lower: analysisResult.confidence_interval_95?.[0] ?? 0.0,
-            ci_upper: analysisResult.confidence_interval_95?.[1] ?? 1.0,
+            ci_lower: analysisResult.confidence_interval_95?.[0] ?? null,
+            ci_upper: analysisResult.confidence_interval_95?.[1] ?? null,
             boundary_analysis: {
               seams_detected: analysisResult.audio_metadata?.detected_boundary_count || 0,
-              seam_timestamps: analysisResult.explanations?.boundary_explanations?.map((b) => b.timestamp_seconds) || [],
+              seam_timestamps: Array.isArray(analysisResult.explanations)
+                ? analysisResult.explanations.map((b) => b.timestamp_sec)
+                : [],
             },
-            language_transitions: analysisResult.explanations?.boundary_explanations || [],
+            language_transitions: Array.isArray(analysisResult.explanations)
+              ? analysisResult.explanations
+              : [],
           },
           call_id: selectedSample ? `VS-${selectedSample.toUpperCase()}` : `VS-${Date.now()}`,
         }),
       });
 
       if (!res.ok) {
-        throw new Error("Failed to generate PDF certificate.");
+        throw new Error("Failed to generate PDF report.");
       }
 
       const blob = await res.blob();
@@ -973,13 +978,13 @@ export default function App() {
                 >
                   <div>
                     <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-white)", display: "flex", alignItems: "center", gap: "6px" }}>
-                      <span>🏛️ Enterprise Compliance & Banking Audit</span>
+                      <span>📄 Forensic Audit & Incident Reporting</span>
                       <span className="mono-text" style={{ fontSize: "10px", padding: "2px 6px", background: "rgba(37,99,235,0.15)", color: "#60a5fa", borderRadius: "4px" }}>
-                        DPDPA 2023 & RBI CSF
+                        Non-Semantic Acoustic Processing
                       </span>
                     </div>
                     <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "3px" }}>
-                      Download cryptographic audit certificate or dispatch automated call policy to contact center IVR.
+                      Generate cryptographic audit incident report (PDF) or trigger automated telephony IVR webhook.
                     </div>
                   </div>
 

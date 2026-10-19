@@ -109,8 +109,8 @@ def generate_forensic_certificate_pdf(
     elements = []
 
     # 1. Header Banner & Verification Seal
-    elements.append(Paragraph("VAANISHIELD FORENSIC INCIDENT & AUDIT CERTIFICATE", title_style))
-    elements.append(Paragraph("ZERO-TRANSCRIPT ACOUSTIC VERIFICATION | CERT-IN & RBI COMPLIANCE COMPLIANT", subtitle_style))
+    elements.append(Paragraph("VAANISHIELD FORENSIC INCIDENT & AUDIT REPORT", title_style))
+    elements.append(Paragraph("AUTOMATED ACOUSTIC CHANGE-POINT & BIOMETRIC VERIFICATION REPORT", subtitle_style))
     elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#2563EB'), spaceAfter=10))
 
     # Timestamp and Meta
@@ -119,28 +119,28 @@ def generate_forensic_certificate_pdf(
     if not file_hash and audio_path:
         file_hash = compute_sha256(audio_path)
     if not file_hash:
-        file_hash = hashlib.sha256(str(analysis_result.get("fusion_score", 0.0)).encode()).hexdigest()
+        file_hash = "NOT_PROVIDED"
 
-    assigned_call_id = call_id or f"VS-AUDIT-{file_hash[:10].upper()}"
+    assigned_call_id = call_id or (f"VS-AUDIT-{file_hash[:10].upper()}" if file_hash != "NOT_PROVIDED" else f"VS-AUDIT-{int(datetime.datetime.now().timestamp())}")
 
     decision = analysis_result.get("decision", "ALLOW_VERIFIED")
     p_spoof = float(analysis_result.get("calibrated_p_spoof", analysis_result.get("calibrated_probability", 0.0)))
     fusion_score = float(analysis_result.get("fusion_score", 0.0))
-    tier = analysis_result.get("tier", "LOW")
+    tier = analysis_result.get("tier", "SECURE")
 
     # Decision Badge Colors
-    if decision == "BLOCK_AND_ALERT" or p_spoof >= 0.75:
+    if decision == "BLOCK_AND_ALERT" or p_spoof >= 0.52:
         badge_bg = colors.HexColor('#FEE2E2')
         badge_fg = colors.HexColor('#991B1B')
-        verdict_str = "CRITICAL RISK - SPOOF DETECTED [TERMINATE / BLOCK]"
-    elif decision == "STEP_UP_AUTH" or p_spoof >= 0.40:
+        verdict_str = f"RISK TIER: {tier} - SPOOF DETECTED [ACTION: {decision}]"
+    elif decision == "STEP_UP_AUTH" or p_spoof >= 0.48:
         badge_bg = colors.HexColor('#FEF3C7')
         badge_fg = colors.HexColor('#92400E')
-        verdict_str = "ELEVATED ANOMALY - SUSPICIOUS [STEP-UP AUTH REQUIRED]"
+        verdict_str = f"RISK TIER: {tier} - SUSPICIOUS / UNCERTAIN [ACTION: {decision}]"
     else:
         badge_bg = colors.HexColor('#DCFCE7')
         badge_fg = colors.HexColor('#166534')
-        verdict_str = "AUTHENTIC HUMAN VOICE - BIOMETRICS VERIFIED [ALLOW]"
+        verdict_str = f"RISK TIER: {tier} - VERIFIED GENUINE [ACTION: {decision}]"
 
     # Verdict Box
     verdict_table = Table(
@@ -161,14 +161,14 @@ def generate_forensic_certificate_pdf(
     elements.append(Paragraph("1. Session Integrity & Cryptographic Identity", section_heading))
     
     meta_data = [
-        [Paragraph("<b>Audit Certificate ID:</b>", body_style), Paragraph(assigned_call_id, body_bold),
+        [Paragraph("<b>Audit Report ID:</b>", body_style), Paragraph(assigned_call_id, body_bold),
          Paragraph("<b>Timestamp (UTC):</b>", body_style), Paragraph(generated_at, body_style)],
-        [Paragraph("<b>Audio SHA-256 Digest:</b>", body_style), Paragraph(f"<font name='Courier'>{file_hash}</font>", body_style),
+        [Paragraph("<b>Audio SHA-256 Digest:</b>", body_style), Paragraph(f"<font name='Courier'>{file_hash[:32]}...<br/>{file_hash[32:] if len(file_hash) > 32 else ''}</font>", body_style),
          Paragraph("<b>Sampling Spec:</b>", body_style), Paragraph("8,000 Hz Narrowband Standardized", body_style)],
-        [Paragraph("<b>Pipeline Version:</b>", body_style), Paragraph("VaaniShield v2.4 (Enterprise Guard)", body_style),
-         Paragraph("<b>Privacy Framework:</b>", body_style), Paragraph("DPDPA 2023 Acoustic Non-Semantic", body_style)]
+        [Paragraph("<b>Pipeline Engine:</b>", body_style), Paragraph("VaaniShield Research & Detection Engine", body_style),
+         Paragraph("<b>Privacy Framework:</b>", body_style), Paragraph("Non-Semantic Acoustic Processing", body_style)]
     ]
-    meta_table = Table(meta_data, colWidths=[130, 160, 110, 140])
+    meta_table = Table(meta_data, colWidths=[120, 170, 110, 140])
     meta_table.setStyle(TableStyle([
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
         ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F8FAFC')),
@@ -180,8 +180,9 @@ def generate_forensic_certificate_pdf(
 
     # 3. Biometric & Calibration Risk Assessment
     elements.append(Paragraph("2. Biometric Authenticity & Risk Metrics", section_heading))
-    ci_lower = analysis_result.get("ci_lower", max(0.0, p_spoof - 0.08))
-    ci_upper = analysis_result.get("ci_upper", min(1.0, p_spoof + 0.08))
+    ci_lower = analysis_result.get("ci_lower")
+    ci_upper = analysis_result.get("ci_upper")
+    ci_display = f"[{ci_lower * 100:.1f}%, {ci_upper * 100:.1f}%]" if (ci_lower is not None and ci_upper is not None) else "N/A"
 
     risk_data = [
         [
@@ -193,37 +194,39 @@ def generate_forensic_certificate_pdf(
         [
             Paragraph("Calibrated Spoof Probability", body_style),
             Paragraph(f"<b>{p_spoof * 100:.1f}%</b>", body_style),
-            Paragraph("Target EER threshold: < 50.0%", body_style),
+            Paragraph("Decision Threshold &tau;<sub>block</sub> = 52.0%", body_style),
             Paragraph(tier, body_bold)
         ],
         [
             Paragraph("Calibrated Risk Tier", body_style),
             Paragraph(f"Tier: {tier}", body_style),
-            Paragraph("LOW (<40%) | MEDIUM (40-70%) | HIGH (>70%)", body_style),
+            Paragraph("SECURE (<48%) | ELEVATED (48-52%) | CRITICAL (&ge;52%)", body_style),
             Paragraph(decision, body_bold)
         ],
         [
             Paragraph("95% Bootstrap Confidence Interval", body_style),
-            Paragraph(f"[{ci_lower * 100:.1f}%, {ci_upper * 100:.1f}%]", body_style),
-            Paragraph("N=1,000 resamples (non-parametric)", body_style),
-            Paragraph("CONVERGED", body_style)
-        ],
-        [
-            Paragraph("Fusion Decision Score", body_style),
-            Paragraph(f"{fusion_score:.4f}", body_style),
-            Paragraph("Threshold: 0.5000", body_style),
-            Paragraph("EVALUATED", body_style)
+            Paragraph(ci_display, body_style),
+            Paragraph("N=100 bootstrap resamples", body_style),
+            Paragraph("COMPUTED" if ci_lower is not None else "NOT_COMPUTED", body_style)
         ],
     ]
+
+    if fusion_score > 0.0:
+        risk_data.append([
+            Paragraph("Fusion Decision Score", body_style),
+            Paragraph(f"{fusion_score:.4f}", body_style),
+            Paragraph("Raw ensemble logits / distance", body_style),
+            Paragraph("EVALUATED", body_style)
+        ])
 
     boundary_res = analysis_result.get("boundary_analysis", {})
     if boundary_res:
         seams_detected = boundary_res.get("seams_detected", 0)
         risk_data.append([
-            Paragraph("Unsupervised Acoustic Seams", body_style),
+            Paragraph("Acoustic Change-Points", body_style),
             Paragraph(f"<b>{seams_detected}</b> seam point(s)", body_style),
-            Paragraph("Acoustic change-point window analysis", body_style),
-            Paragraph("SPLICE RISK" if seams_detected > 0 else "HOMOGENEOUS", body_bold)
+            Paragraph("Spectral flux & continuity window analysis", body_style),
+            Paragraph("SEAMS DETECTED" if seams_detected > 0 else "HOMOGENEOUS", body_bold)
         ])
 
     risk_table = Table(risk_data, colWidths=[160, 120, 160, 100])
@@ -239,8 +242,8 @@ def generate_forensic_certificate_pdf(
     # 4. Forensic Micro-Seam Breakdown (Zero transcript leakage)
     elements.append(Paragraph("3. Micro-Seam Attribution & Acoustic Transition Signatures", section_heading))
     elements.append(Paragraph(
-        "Notice: To guarantee compliance with DPDPA 2023, VaaniShield strictly preserves data privacy "
-        "by inspecting phonetic and spectral continuity without speech-to-text decoding or transcript retention.",
+        "Notice: Acoustic change-points and spectral continuity are evaluated without speech-to-text "
+        "transcription or text logging to preserve acoustic non-semantic privacy.",
         disclaimer_style
     ))
     elements.append(Spacer(1, 4))
@@ -253,40 +256,40 @@ def generate_forensic_certificate_pdf(
             Paragraph("<b>Timestamp (s)</b>", body_bold),
             Paragraph("<b>Transition Type / Boundary</b>", body_bold),
             Paragraph("<b>Acoustic Artifact Cue</b>", body_bold),
-            Paragraph("<b>Confidence / Anomaly Score</b>", body_bold)
+            Paragraph("<b>Contribution Score</b>", body_bold)
         ]
     ]
 
     if transitions:
-        for t in transitions[:6]:  # Show up to 6 key transitions
-            t_time = t.get("timestamp_seconds", t.get("start_seconds", 0.0))
-            from_lang = t.get("from_language", "Audio")
-            to_lang = t.get("to_language", "Vocoder")
-            cue = t.get("cue", "Phase discontinuity & spectral delta")
-            score = t.get("anomaly_score", t.get("seam_anomaly_score", 0.0))
-            score_str = f"{score * 100:.1f}%" if isinstance(score, float) and score <= 1.0 else f"{score:.2f}"
+        for t in transitions[:6]:
+            t_time = t.get("timestamp_sec", t.get("timestamp_seconds", 0.0))
+            trans_label = t.get("language_transition", "Acoustic Boundary")
+            desc = t.get("description", t.get("cue", "Acoustic discontinuity detected"))
+            c_score = t.get("contribution_score", t.get("anomaly_score", 0.0))
+            score_str = f"{c_score * 100:.1f}%" if isinstance(c_score, float) and c_score <= 1.0 else f"{c_score:.2f}"
 
             seam_data.append([
-                Paragraph(f"{t_time:.2f}s", body_style),
-                Paragraph(f"{from_lang} &rarr; {to_lang}", body_style),
-                Paragraph(cue, body_style),
+                Paragraph(f"{float(t_time):.2f}s", body_style),
+                Paragraph(str(trans_label), body_style),
+                Paragraph(str(desc), body_style),
                 Paragraph(score_str, body_bold)
             ])
     elif boundary_points:
         for b in boundary_points[:6]:
             b_time = b.get("time_seconds", 0.0) if isinstance(b, dict) else float(b)
-            score_val = b.get("anomaly_score", 0.72) if isinstance(b, dict) else 0.72
+            score_val = b.get("anomaly_score", 0.0) if isinstance(b, dict) else 0.0
+            score_str = f"{score_val*100:.1f}%" if score_val > 0.0 else "N/A"
             seam_data.append([
                 Paragraph(f"{b_time:.2f}s", body_style),
-                Paragraph("Acoustic Inconsistency Change-Point", body_style),
-                Paragraph("High spectral feature variance / vocoder discontinuity", body_style),
-                Paragraph(f"{score_val*100:.1f}%", body_bold)
+                Paragraph("Acoustic Spectral Flux Point", body_style),
+                Paragraph("Spectral flux & envelope discontinuity point", body_style),
+                Paragraph(score_str, body_bold)
             ])
     else:
         seam_data.append([
             Paragraph("N/A", body_style),
-            Paragraph("Continuous Audio - No Inter-Segment Splices Detected", body_style),
-            Paragraph("Smooth natural vocal tract formant evolution", body_style),
+            Paragraph("Continuous Audio - No Boundary Splices Localized", body_style),
+            Paragraph("Consistent vocal tract dynamics across inspected duration", body_style),
             Paragraph("0.0%", body_style)
         ])
 
@@ -300,13 +303,13 @@ def generate_forensic_certificate_pdf(
     elements.append(seam_table)
     elements.append(Spacer(1, 14))
 
-    # 5. Regulatory Certification & Verification Seal Box
+    # 5. Technical Disclaimer Box
     legal_text = (
-        "<b>CERTIFICATION STATEMENT:</b> This document certifies an automated cryptographic acoustic analysis "
-        "conducted by the VaaniShield Multi-Tier Voice Biometric Engine. This report conforms to CERT-In Technical "
-        "Advisories on Synthetic Voice Cloning in BFSI transactions and RBI Master Directions on Information Security. "
-        "Calculated metrics reflect acoustic, spectral, and neural synthesis features evaluated against calibrated multi-lingual "
-        "adversarial benchmarks. This certificate is tamper-evident and can be validated against the audio SHA-256 fingerprint."
+        "<b>TECHNICAL ASSESSMENT NOTICE:</b> This document contains the algorithmic output produced by "
+        "the VaaniShield automated voice authenticity analysis system. Metrics represent statistical inferences "
+        "derived from acoustic boundary features, speaker-subspace projection, and calibrated probabilistic thresholds. "
+        "This automated report is intended to assist technical evaluation and should be reviewed alongside institutional "
+        "operational guidelines. Authenticity of the evaluated sample can be referenced against the cryptographic SHA-256 digest."
     )
     legal_table = Table(
         [[Paragraph(legal_text, disclaimer_style)]],
