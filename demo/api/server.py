@@ -61,8 +61,8 @@ def get_pipeline():
     if MODEL is None:
         if not os.path.exists(CHECKPOINT_PATH):
             raise RuntimeError(f"Checkpoint not found at {CHECKPOINT_PATH}. Run scripts/train.py first.")
-        with open(CHECKPOINT_PATH, "rb") as f:
-            data = pickle.load(f)
+        from vaanishield.fusion.classifier import FusionClassifier
+        data = FusionClassifier.load_checkpoint(CHECKPOINT_PATH, verify_checksum=True)
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             CFG = yaml.safe_load(f)
         MODEL = data["model"]

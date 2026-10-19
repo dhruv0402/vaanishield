@@ -279,3 +279,57 @@ class FusionClassifier:
                 "risk_tier": risk_level,
             })
         return decisions
+
+    @classmethod
+    def save_checkpoint(cls, checkpoint_dict: dict, checkpoint_path: str) -> str:
+        """Save model and metadata with cryptographic SHA-256 integrity digest."""
+        import pickle
+        import hashlib
+        from pathlib import Path
+        
+        path = Path(checkpoint_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        
+        raw_bytes = pickle.dumps(checkpoint_dict, protocol=5)
+        sha256 = hashlib.sha256(raw_bytes).hexdigest()
+        
+        with open(path, "wb") as f:
+            f.write(raw_bytes)
+            
+        sha_path = path.with_suffix(".sha256")
+        with open(sha_path, "w", encoding="utf-8") as f:
+            f.write(f"{sha256}  {path.name}\n")
+            
+        logger.info(f"Saved secure checkpoint to {path} (SHA-256: {sha256[:12]}...)")
+        return sha256
+
+    @classmethod
+    def load_checkpoint(cls, checkpoint_path: str, verify_checksum: bool = True) -> dict:
+        """Load model checkpoint and optionally verify cryptographic SHA-256 integrity digest."""
+        import pickle
+        import hashlib
+        from pathlib import Path
+        
+        path = Path(checkpoint_path)
+        if not path.exists():
+            raise FileNotFoundError(f"Checkpoint file not found: {path}")
+            
+        with open(path, "rb") as f:
+            raw_bytes = f.read()
+            
+        computed_sha256 = hashlib.sha256(raw_bytes).hexdigest()
+        sha_path = path.with_suffix(".sha256")
+        
+        if verify_checksum and sha_path.exists():
+            with open(sha_path, "r", encoding="utf-8") as f:
+                expected_sha256 = f.read().split()[0].strip()
+            if computed_sha256 != expected_sha256:
+                raise ValueError(
+                    f"Checkpoint integrity verification failed for {path}!\n"
+                    f"Expected: {expected_sha256}\n"
+                    f"Computed: {computed_sha256}"
+                )
+            logger.info(f"Checkpoint integrity verified: {computed_sha256[:12]}...")
+            
+        return pickle.loads(raw_bytes)
+
