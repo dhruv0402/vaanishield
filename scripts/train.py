@@ -62,12 +62,14 @@ def train(
     elif model_type == "fusion":
         # 1. Fit SNAP Speaker Nulling Projector strictly on train split
         projector = SpeakerNullingProjector(
-            ssl_backbone=cfg.get("speaker_null", {}).get("ssl_backbone", "microsoft/wavlm-base-plus")
+            ssl_backbone=cfg.get("speaker_null", {}).get("ssl_backbone", "microsoft/wavlm-base-plus"),
+            default_regularization=0.05,
         )
         speaker_ids = [r["speaker_id"] for r in train_records]
         raw_embs = np.array([projector.embed(p) for p in audio_paths], dtype=np.float32)
-        projector.fit_speaker_subspace(raw_embs, speaker_ids=speaker_ids, n_components=4)
-        nulled_embs = projector.project(raw_embs)
+        n_comp = min(8, len(set(speaker_ids)) - 1)
+        projector.fit_speaker_subspace(raw_embs, speaker_ids=speaker_ids, n_components=n_comp)
+        nulled_embs = projector.project(raw_embs, regularization=0.05)
 
         # 2. Extract boundary features
         def parse_cs_points(rec):
@@ -101,7 +103,7 @@ def train(
             val_audio_paths = [r["audio_path"] for r in val_records]
             val_labels = np.array([1 if r.get("label") == "spoof" else 0 for r in val_records], dtype=np.int32)
             val_raw_embs = np.array([projector.embed(p) for p in val_audio_paths], dtype=np.float32)
-            val_sn = projector.project(val_raw_embs)
+            val_sn = projector.project(val_raw_embs, regularization=0.05)
             val_bmat = build_boundary_mat(val_records)
 
         # 3. Fit calibrated FusionClassifier using train split and tune/calibrate on val split

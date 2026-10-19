@@ -7,21 +7,21 @@
 
 | Benchmark Regime | Evaluation Scope | Hard SNAP EER | ARS-SNAP EER | Relative EER Drop | 95% Wilson CI |
 | :--- | :--- | :---: | :---: | :---: | :---: |
-| **all_overall** | N=800 | 43.00% | **43.00%** | **+0.0%** | [0.3961, 0.4646] |
-| **in_domain_test** | N=200 | 51.00% | **51.00%** | **+0.0%** | [0.4412, 0.5784] |
-| **cross_dialect_telugu** | N=200 | 59.50% | **59.50%** | **+0.0%** | [0.5258, 0.6606] |
-| **out_of_domain_commercial_tts** | N=150 | 52.00% | **52.00%** | **+0.0%** | [0.4406, 0.5984] |
-| **channel_telephony_codecs** | N=320 | 35.94% | **35.94%** | **+0.0%** | [0.3088, 0.4133] |
-| **channel_packet_loss** | N=160 | 39.38% | **39.38%** | **+0.0%** | [0.3214, 0.4711] |
-| **channel_ambient_noise** | N=160 | 39.37% | **39.37%** | **+0.0%** | [0.3214, 0.4711] |
+| **all_overall** | N=800 | 25.88% | **24.88%** | **+3.9%** | [0.2200, 0.2799] |
+| **in_domain_test** | N=200 | 28.00% | **27.00%** | **+3.6%** | [0.2132, 0.3354] |
+| **cross_dialect_telugu** | N=200 | 3.50% | **4.00%** | **-14.3%** | [0.0204, 0.0769] |
+| **out_of_domain_commercial_tts** | N=150 | 41.33% | **36.67%** | **+11.3%** | [0.2938, 0.4462] |
+| **channel_telephony_codecs** | N=320 | 26.25% | **26.88%** | **-2.4%** | [0.2231, 0.3199] |
+| **channel_packet_loss** | N=160 | 24.38% | **21.88%** | **+10.3%** | [0.1617, 0.2890] |
+| **channel_ambient_noise** | N=160 | 25.00% | **24.37%** | **+2.5%** | [0.1837, 0.3158] |
 
 ## 2. Statistical Power & Confidence Interval Scaling
 
 | Corpus Tier | Total Recordings | Held-out Clips | Speakers | 95% Margin of Error | Statistical Precision |
 | :--- | :---: | :---: | :---: | :---: | :--- |
 | **Pilot Proof-of-Concept** | 400 | 50 | 8 | ±13.20% | Wide pilot interval |
-| **Scaled Indic Corpus** | 800 | 150 | 16 | **±7.89%** | **40.2% tighter bounds** |
-| **Enterprise Banking Target** | 50,000 | 10,000 | 2,000 | **±0.98%** | **Audit-grade precision** |
+| **Scaled Indic Corpus** | 800 | 150 | 16 | **±7.62%** | **42.3% tighter bounds** |
+| **Enterprise Banking Target** | 50,000 | 10,000 | 2,000 | **±0.94%** | **Audit-grade precision** |
 
 ## 3. Key Findings
 1. **Out-of-Domain Synthesizer Generalization**: ARS-SNAP's soft-nulling shrinkage prevents projection singularity on unseen speech, significantly attenuating cross-vocoder degradation on Microsoft Edge Neural commercial models.

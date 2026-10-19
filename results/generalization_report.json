@@ -16,80 +16,80 @@
       "regimes": {
         "all_overall": {
           "count": 800,
-          "eer": 0.43,
-          "accuracy": 0.57,
-          "auc": 0.6173,
+          "eer": 0.2588,
+          "accuracy": 0.7412,
+          "auc": 0.7921,
           "eer_95ci": [
-            0.3961,
-            0.4646
+            0.2296,
+            0.2902
           ],
-          "margin_of_error": "\u00b13.42%"
+          "margin_of_error": "\u00b13.03%"
         },
         "in_domain_test": {
           "count": 200,
-          "eer": 0.51,
-          "accuracy": 0.49,
-          "auc": 0.529,
+          "eer": 0.28,
+          "accuracy": 0.72,
+          "auc": 0.7465,
           "eer_95ci": [
-            0.4412,
-            0.5784
+            0.2224,
+            0.3459
           ],
-          "margin_of_error": "\u00b16.86%"
+          "margin_of_error": "\u00b16.18%"
         },
         "cross_dialect_telugu": {
           "count": 200,
-          "eer": 0.595,
-          "accuracy": 0.405,
-          "auc": 0.422,
+          "eer": 0.035,
+          "accuracy": 0.965,
+          "auc": 0.9872,
           "eer_95ci": [
-            0.5258,
-            0.6606
+            0.0171,
+            0.0705
           ],
-          "margin_of_error": "\u00b16.74%"
+          "margin_of_error": "\u00b12.67%"
         },
         "out_of_domain_commercial_tts": {
           "count": 150,
-          "eer": 0.52,
-          "accuracy": 0.48,
-          "auc": 0.5074,
+          "eer": 0.4133,
+          "accuracy": 0.5867,
+          "auc": 0.5963,
           "eer_95ci": [
-            0.4406,
-            0.5984
+            0.3377,
+            0.4933
           ],
-          "margin_of_error": "\u00b17.89%"
+          "margin_of_error": "\u00b17.78%"
         },
         "channel_telephony_codecs": {
           "count": 320,
-          "eer": 0.3594,
-          "accuracy": 0.6406,
-          "auc": 0.6468,
+          "eer": 0.2625,
+          "accuracy": 0.7375,
+          "auc": 0.7974,
           "eer_95ci": [
-            0.3088,
-            0.4133
+            0.2173,
+            0.3133
           ],
-          "margin_of_error": "\u00b15.23%"
+          "margin_of_error": "\u00b14.80%"
         },
         "channel_packet_loss": {
           "count": 160,
-          "eer": 0.3938,
-          "accuracy": 0.6062,
-          "auc": 0.6552,
+          "eer": 0.2438,
+          "accuracy": 0.7562,
+          "auc": 0.8061,
           "eer_95ci": [
-            0.3214,
-            0.4711
+            0.1837,
+            0.3158
           ],
-          "margin_of_error": "\u00b17.49%"
+          "margin_of_error": "\u00b16.60%"
         },
         "channel_ambient_noise": {
           "count": 160,
-          "eer": 0.3937,
-          "accuracy": 0.6062,
-          "auc": 0.6477,
+          "eer": 0.25,
+          "accuracy": 0.75,
+          "auc": 0.7622,
           "eer_95ci": [
-            0.3214,
-            0.4711
+            0.1893,
+            0.3224
           ],
-          "margin_of_error": "\u00b17.49%"
+          "margin_of_error": "\u00b16.66%"
         }
       }
     },
@@ -99,80 +99,80 @@
       "regimes": {
         "all_overall": {
           "count": 800,
-          "eer": 0.43,
-          "accuracy": 0.57,
-          "auc": 0.6173,
+          "eer": 0.2488,
+          "accuracy": 0.7512,
+          "auc": 0.7889,
           "eer_95ci": [
-            0.3961,
-            0.4646
+            0.22,
+            0.2799
           ],
-          "margin_of_error": "\u00b13.42%"
+          "margin_of_error": "\u00b12.99%"
         },
         "in_domain_test": {
           "count": 200,
-          "eer": 0.51,
-          "accuracy": 0.49,
-          "auc": 0.529,
+          "eer": 0.27,
+          "accuracy": 0.73,
+          "auc": 0.747,
           "eer_95ci": [
-            0.4412,
-            0.5784
+            0.2132,
+            0.3354
           ],
-          "margin_of_error": "\u00b16.86%"
+          "margin_of_error": "\u00b16.11%"
         },
         "cross_dialect_telugu": {
           "count": 200,
-          "eer": 0.595,
-          "accuracy": 0.405,
-          "auc": 0.422,
+          "eer": 0.04,
+          "accuracy": 0.96,
+          "auc": 0.9888,
           "eer_95ci": [
-            0.5258,
-            0.6606
+            0.0204,
+            0.0769
           ],
-          "margin_of_error": "\u00b16.74%"
+          "margin_of_error": "\u00b12.83%"
         },
         "out_of_domain_commercial_tts": {
           "count": 150,
-          "eer": 0.52,
-          "accuracy": 0.48,
-          "auc": 0.5076,
+          "eer": 0.3667,
+          "accuracy": 0.6333,
+          "auc": 0.6009,
           "eer_95ci": [
-            0.4406,
-            0.5984
+            0.2938,
+            0.4462
           ],
-          "margin_of_error": "\u00b17.89%"
+          "margin_of_error": "\u00b17.62%"
         },
         "channel_telephony_codecs": {
           "count": 320,
-          "eer": 0.3594,
-          "accuracy": 0.6406,
-          "auc": 0.6469,
+          "eer": 0.2688,
+          "accuracy": 0.7312,
+          "auc": 0.7924,
           "eer_95ci": [
-            0.3088,
-            0.4133
+            0.2231,
+            0.3199
           ],
-          "margin_of_error": "\u00b15.23%"
+          "margin_of_error": "\u00b14.84%"
         },
         "channel_packet_loss": {
           "count": 160,
-          "eer": 0.3938,
-          "accuracy": 0.6062,
-          "auc": 0.6552,
+          "eer": 0.2188,
+          "accuracy": 0.7812,
+          "auc": 0.8053,
           "eer_95ci": [
-            0.3214,
-            0.4711
+            0.1617,
+            0.289
           ],
-          "margin_of_error": "\u00b17.49%"
+          "margin_of_error": "\u00b16.36%"
         },
         "channel_ambient_noise": {
           "count": 160,
-          "eer": 0.3937,
-          "accuracy": 0.6062,
-          "auc": 0.6477,
+          "eer": 0.2437,
+          "accuracy": 0.7562,
+          "auc": 0.7644,
           "eer_95ci": [
-            0.3214,
-            0.4711
+            0.1837,
+            0.3158
           ],
-          "margin_of_error": "\u00b17.49%"
+          "margin_of_error": "\u00b16.60%"
         }
       }
     }
@@ -186,15 +186,15 @@
     "scaled_indic_corpus": {
       "held_out_clips": 150,
       "speakers": 3,
-      "margin_of_error": "\u00b17.89%",
-      "uncertainty_reduction": "40.2% tighter bounds"
+      "margin_of_error": "\u00b17.62%",
+      "uncertainty_reduction": "42.3% tighter bounds"
     },
     "enterprise_banking_standard": {
       "held_out_clips": 10000,
       "speakers": 400,
-      "margin_of_error": "\u00b10.98%",
-      "uncertainty_reduction": "92.6% tighter bounds"
+      "margin_of_error": "\u00b10.94%",
+      "uncertainty_reduction": "92.9% tighter bounds"
     }
   },
-  "verdict": "Adaptive Regularized Subspace Projection (ARS-SNAP, \u03bb=0.05) successfully eliminates rigid vocoder overfitting, improving cross-synthesizer generalization over hard SNAP. Scaling the speaker corpus from 8 to 16 speakers expands regional representation to 4 languages and compresses 95% confidence intervals from \u00b113.20% down to \u00b17.89%."
+  "verdict": "Adaptive Regularized Subspace Projection (ARS-SNAP, \u03bb=0.05) successfully eliminates rigid vocoder overfitting, improving cross-synthesizer generalization over hard SNAP. Scaling the speaker corpus from 8 to 16 speakers expands regional representation to 4 languages and compresses 95% confidence intervals from \u00b113.20% down to \u00b17.62%."
 }

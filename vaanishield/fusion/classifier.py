@@ -306,6 +306,11 @@ class FusionClassifier:
         return sha256
 
     @classmethod
+    def save_parameters_npz(cls, model: Any, projector: Any, npz_path: str) -> str:
+        """Alias for save_zero_pickle accepting (model, projector, path)."""
+        return cls.save_zero_pickle({"model": model, "projector": projector}, npz_path)
+
+    @classmethod
     def save_zero_pickle(cls, checkpoint_dict: dict, npz_path: str) -> str:
         """Export model parameters into a pure zero-pickle NumPy archive with SHA-256 sidecar.
 

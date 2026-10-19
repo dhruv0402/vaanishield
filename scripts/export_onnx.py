@@ -180,7 +180,7 @@ def export_and_benchmark(
 
     model: FusionClassifier = data["model"]
     projector = data["projector"]
-    speaker_subspace = projector.speaker_subspace.astype(np.float32)
+    speaker_subspace = projector.get_effective_subspace(0.05).astype(np.float32)
 
     # 1. Extract boundary parameters
     if model._scaler_b is not None:
