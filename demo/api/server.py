@@ -300,8 +300,8 @@ async def analyze_audio(
             "operational_decision": {
                 "decision": decision_action,
                 "risk_tier": risk_level,
-                "tau_review": getattr(model, "tau_review", 0.48),
-                "tau_block": getattr(model, "tau_block", 0.52),
+                "tau_review": getattr(model, "tau_review", 0.38),
+                "tau_block": getattr(model, "tau_block", 0.58),
                 "recommended_action": action_taken,
             },
             "action_taken": action_taken,

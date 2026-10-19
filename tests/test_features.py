@@ -103,3 +103,45 @@ def test_feature_vector_is_fixed_length():
     assert np.allclose(vec_3[:5], 2.0)
     assert np.allclose(vec_3[5:], 3.0)
 
+
+def test_batched_yin_pitch_accuracy():
+    """Verify YIN pitch estimation accurately captures both male (120Hz) and female (240Hz) pitches."""
+    from vaanishield.boundary.features import batched_yin_pitch
+    sr = 16000
+    duration = 0.5
+    t = np.linspace(0, duration, int(sr * duration), endpoint=False)
+
+    # 1. Male pitch baseline (120 Hz)
+    tone_male = np.sin(2 * np.pi * 120.0 * t).astype(np.float32)
+    p_male = batched_yin_pitch(tone_male, sr=sr, fmin=75.0, fmax=500.0)
+    med_male = float(np.median(p_male[p_male > 0]))
+    assert abs(med_male - 120.0) < 1.0
+
+    # 2. Female pitch baseline (240 Hz)
+    tone_female = np.sin(2 * np.pi * 240.0 * t).astype(np.float32)
+    p_female = batched_yin_pitch(tone_female, sr=sr, fmin=75.0, fmax=500.0)
+    med_female = float(np.median(p_female[p_female > 0]))
+    assert abs(med_female - 240.0) < 1.0
+
+
+def test_dual_mode_monolingual_routing():
+    """Verify dual-mode stream routing returns active acoustic descriptors when no code-switches exist."""
+    from vaanishield.boundary.features import extract_boundary_features
+    sr = 16000
+    duration = 1.0
+    t = np.linspace(0, duration, int(sr * duration), endpoint=False)
+    # Natural-like harmonic signal
+    audio = (np.sin(2 * np.pi * 200.0 * t) + 0.3 * np.sin(2 * np.pi * 400.0 * t)).astype(np.float32)
+
+    # Pass empty code-switch points -> triggers dual-mode monolingual fallback
+    vectors = extract_boundary_features(audio, codeswitch_points=[], sr=sr, fallback_monolingual=True)
+    assert len(vectors) == 1
+    assert vectors[0].codeswitch_point.from_lang == "monolingual"
+
+    vec_agg = aggregate_boundary_features(vectors, aggregation="mean_and_max")
+    assert vec_agg.shape == (10,)
+    # Vector must contain active non-zero discriminative acoustic signal
+    assert not np.all(vec_agg == 0.0)
+    assert np.all(np.isfinite(vec_agg))
+
+

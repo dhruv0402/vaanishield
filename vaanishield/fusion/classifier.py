@@ -14,7 +14,7 @@ high sensitivity on code-switch boundary seams.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, Dict, List
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.calibration import CalibratedClassifierCV
@@ -249,10 +249,15 @@ class FusionClassifier:
         self,
         boundary_features: Any,
         speaker_nulled_embeddings: Optional[np.ndarray] = None,
-        tau_review: float = 0.48,
-        tau_block: float = 0.52,
+        tau_review: float = 0.38,
+        tau_block: float = 0.58,
     ) -> Any:
-        """Evaluate two-tier operational risk decision."""
+        """Evaluate three-tier operational risk decision under Neyman-Pearson cost calibration.
+
+        - p < tau_review (0.38): ALLOW_VERIFIED (Frictionless banking transaction).
+        - tau_review <= p < tau_block (0.38 - 0.58): STEP_UP_AUTH (Trigger SMS OTP / Out-of-band challenge).
+        - p >= tau_block (0.58): BLOCK_AND_ALERT (Confirmed fraud attempt, automatic block & fraud desk routing).
+        """
         if speaker_nulled_embeddings is None and isinstance(boundary_features, (int, float, np.floating)):
             p = float(boundary_features)
             if p >= tau_block:
@@ -281,6 +286,38 @@ class FusionClassifier:
                 "risk_tier": risk_level,
             })
         return decisions
+
+    @staticmethod
+    def calibrate_neyman_pearson(
+        y_true: np.ndarray,
+        y_scores: np.ndarray,
+        target_far: float = 0.01,
+    ) -> Dict[str, float]:
+        """Calibrate Neyman-Pearson asymmetric operational threshold for enterprise banking fraud risk.
+
+        Finds the operational decision threshold tau* that bounds False Acceptance Rate (FAR)
+        at <= target_far (e.g. 1.0% or 0.1%) on bona fide calls while optimizing synthetic spoof recall.
+        """
+        y_true = np.asarray(y_true, dtype=np.int32)
+        y_scores = np.asarray(y_scores, dtype=np.float32)
+
+        bona_fide_scores = y_scores[y_true == 0]
+        spoof_scores = y_scores[y_true == 1]
+
+        if len(bona_fide_scores) == 0:
+            return {"tau_star": 0.5, "empirical_far": 0.0, "empirical_frr": 0.0, "target_far": target_far}
+
+        # Percentile ensuring FAR <= target_far
+        tau_star = float(np.percentile(bona_fide_scores, (1.0 - target_far) * 100.0))
+        empirical_far = float(np.mean(bona_fide_scores >= tau_star))
+        empirical_frr = float(np.mean(spoof_scores < tau_star)) if len(spoof_scores) > 0 else 0.0
+
+        return {
+            "tau_star": round(tau_star, 4),
+            "empirical_far": round(empirical_far, 4),
+            "empirical_frr": round(empirical_frr, 4),
+            "target_far": target_far,
+        }
 
     @classmethod
     def save_checkpoint(cls, checkpoint_dict: dict, checkpoint_path: str) -> str:
