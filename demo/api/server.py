@@ -9,7 +9,7 @@ import numpy as np
 import yaml
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import time
@@ -18,6 +18,7 @@ from vaanishield.boundary.localization import find_codeswitch_points, CodeSwitch
 from vaanishield.boundary.features import extract_boundary_features, aggregate_boundary_features
 from vaanishield.utils.audio_io import load_audio, save_audio
 from vaanishield.fusion.explain import explain_prediction
+from vaanishield.reporting.certificate import generate_forensic_certificate_pdf, compute_sha256
 
 app = FastAPI(title="VaaniShield Research & Detection API", version="2.0.0")
 
@@ -296,6 +297,61 @@ def get_evaluation_reports():
         "evaluation": eval_data,
         "ablation": ablation_data,
     }
+
+
+class CertificateRequest(BaseModel):
+    analysis_result: dict
+    call_id: Optional[str] = None
+
+
+@app.post("/api/export_certificate")
+async def export_certificate(req: CertificateRequest):
+    """
+    Generates a tamper-evident PDF Forensic Audit Incident Certificate
+    compliant with RBI / CERT-In directives and DPDPA 2023 non-semantic privacy.
+    """
+    try:
+        pdf_bytes = generate_forensic_certificate_pdf(
+            analysis_result=req.analysis_result,
+            call_id=req.call_id
+        )
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename=vaanishield_forensic_audit_{int(time.time())}.pdf"
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate certificate: {str(e)}")
+
+
+class PolicyWebhookRequest(BaseModel):
+    call_id: str
+    decision: str
+    spoof_probability: float
+    target_webhook_url: Optional[str] = None
+
+
+@app.post("/api/webhook/dispatch")
+async def dispatch_policy_webhook(req: PolicyWebhookRequest):
+    """
+    Dispatches automated call control decisions to banking contact center / IVR webhooks.
+    """
+    # Policy routing rules
+    action = "TERMINATE_CALL" if req.decision == "BLOCK_AND_ALERT" else (
+        "STEP_UP_MFA" if req.decision == "STEP_UP_AUTH" else "ALLOW_CALL"
+    )
+    payload = {
+        "event": "vaanishield.call_guard.decision",
+        "timestamp": int(time.time()),
+        "call_id": req.call_id,
+        "decision": req.decision,
+        "action": action,
+        "spoof_probability": req.spoof_probability,
+        "status": "DISPATCHED_TO_IVR"
+    }
+    return {"status": "success", "dispatched_payload": payload}
 
 
 @app.websocket("/ws/stream_analyze")

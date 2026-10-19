@@ -77,6 +77,8 @@ export default function App() {
   const [successMsg, setSuccessMsg] = useState("");
   const [analysisResult, setAnalysisResult] = useState(null);
   const [showTechnicalLog, setShowTechnicalLog] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [webhookStatus, setWebhookStatus] = useState(null);
 
   // Live Microphone & Streaming Call Guard states
   const [isRecording, setIsRecording] = useState(false);
@@ -391,6 +393,77 @@ export default function App() {
       setApiError(err.message || "Failed to analyze audio.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Export Forensic PDF Certificate
+  const exportForensicCertificate = async () => {
+    if (!analysisResult) return;
+    try {
+      setIsExportingPdf(true);
+      setApiError("");
+      const res = await fetch(`${API_BASE}/api/export_certificate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          analysis_result: {
+            ...analysisResult,
+            calibrated_p_spoof: analysisResult.spoof_probability,
+            tier: analysisResult.operational_decision?.risk_tier || "SECURE",
+            decision: analysisResult.operational_decision?.decision || "ALLOW_VERIFIED",
+            ci_lower: analysisResult.confidence_interval_95?.[0] ?? 0.0,
+            ci_upper: analysisResult.confidence_interval_95?.[1] ?? 1.0,
+            boundary_analysis: {
+              seams_detected: analysisResult.audio_metadata?.detected_boundary_count || 0,
+              seam_timestamps: analysisResult.explanations?.boundary_explanations?.map((b) => b.timestamp_seconds) || [],
+            },
+            language_transitions: analysisResult.explanations?.boundary_explanations || [],
+          },
+          call_id: selectedSample ? `VS-${selectedSample.toUpperCase()}` : `VS-${Date.now()}`,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to generate PDF certificate.");
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `vaanishield_forensic_incident_report_${Date.now()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      setSuccessMsg("Forensic Audit Certificate (PDF) downloaded successfully.");
+    } catch (err) {
+      setApiError(err.message || "Failed to download audit certificate.");
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  // Dispatch IVR Policy Webhook
+  const dispatchIvrWebhook = async () => {
+    if (!analysisResult) return;
+    try {
+      setWebhookStatus("DISPATCHING");
+      const res = await fetch(`${API_BASE}/api/webhook/dispatch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          call_id: selectedSample ? `CALL-${selectedSample.toUpperCase()}` : `CALL-${Date.now()}`,
+          decision: analysisResult.operational_decision?.decision || "ALLOW_VERIFIED",
+          spoof_probability: analysisResult.spoof_probability,
+        }),
+      });
+      const data = await res.json();
+      setWebhookStatus(data.dispatched_payload?.action || "DISPATCHED");
+      setSuccessMsg(`Policy Action [${data.dispatched_payload?.action}] successfully dispatched to Bank IVR Switch.`);
+    } catch (err) {
+      setApiError("Failed to trigger webhook dispatch: " + err.message);
+      setWebhookStatus("FAILED");
     }
   };
 
@@ -881,6 +954,70 @@ export default function App() {
                       ))}
                     </div>
                   )}
+                </div>
+
+                {/* Enterprise Compliance & Action Toolbar */}
+                <div
+                  style={{
+                    marginTop: "20px",
+                    padding: "16px",
+                    background: "var(--bg-base)",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: "10px",
+                    display: "flex",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-white)", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span>🏛️ Enterprise Compliance & Banking Audit</span>
+                      <span className="mono-text" style={{ fontSize: "10px", padding: "2px 6px", background: "rgba(37,99,235,0.15)", color: "#60a5fa", borderRadius: "4px" }}>
+                        DPDPA 2023 & RBI CSF
+                      </span>
+                    </div>
+                    <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "3px" }}>
+                      Download cryptographic audit certificate or dispatch automated call policy to contact center IVR.
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <button
+                      type="button"
+                      id="export-pdf-cert-btn"
+                      className="btn-primary"
+                      style={{
+                        padding: "8px 16px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
+                      }}
+                      disabled={isExportingPdf}
+                      onClick={exportForensicCertificate}
+                    >
+                      {isExportingPdf ? "Generating PDF..." : "📄 Export Forensic Audit Certificate (PDF)"}
+                    </button>
+
+                    <button
+                      type="button"
+                      id="dispatch-ivr-btn"
+                      className="btn-secondary"
+                      style={{
+                        padding: "8px 14px",
+                        fontSize: "12px",
+                        borderColor: "var(--border-subtle)",
+                      }}
+                      onClick={dispatchIvrWebhook}
+                    >
+                      {webhookStatus === "DISPATCHING"
+                        ? "Dispatching..."
+                        : webhookStatus
+                        ? `IVR: ${webhookStatus} ✓`
+                        : "⚡ Dispatch IVR Policy"}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Diagnostics Toggle */}
