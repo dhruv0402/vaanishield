@@ -36,8 +36,11 @@ COPY checkpoints/ /app/checkpoints/
 COPY data/ /app/data/
 COPY demo/ /app/demo/
 
-# Copy compiled frontend from Stage 1 into demo/web_dist
-COPY --from=frontend-builder /app/web/dist /app/demo/web_dist
+# Copy compiled frontend from Stage 1 into web/dist (matching demo/api/server.py WEB_DIST_DIR)
+COPY --from=frontend-builder /app/web/dist /app/web/dist
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/api/health || exit 1
 
 EXPOSE 8000
 
