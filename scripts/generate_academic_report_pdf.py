@@ -60,7 +60,7 @@ class NumberedCanvas(canvas.Canvas):
 
 
 def build_pdf():
-    pdf_path = Path("VaaniShield_Academic_Project_Report.pdf")
+    pdf_path = Path("Report_Template (1).pdf")
     doc = SimpleDocTemplate(
         str(pdf_path),
         pagesize=letter,
@@ -212,25 +212,31 @@ def build_pdf():
     # -------------------------------------------------------------
     # 1. TITLE / COVER PAGE
     # -------------------------------------------------------------
-    story.append(Spacer(1, 40))
-    story.append(Paragraph("VAANISHIELD: CODE-SWITCH-AWARE DEEPFAKE VOICE DETECTION FOR FINANCIAL FRAUD CALLS IN INDIAN MULTILINGUAL SPEECH", title_style))
-    story.append(Spacer(1, 15))
-    story.append(Paragraph("Advanced Artificial Intelligence (CSE_3139)<br/><b>V SEMESTER MINI PROJECT REPORT</b><br/><br/>Submitted to", subtitle_style))
     story.append(Spacer(1, 10))
+    story.append(Paragraph("VAANISHIELD: CODE-SWITCH-AWARE DEEPFAKE VOICE DETECTION FOR FINANCIAL FRAUD CALLS IN INDIAN MULTILINGUAL SPEECH", title_style))
+    story.append(Spacer(1, 8))
+    story.append(Paragraph("Advanced Artificial Intelligence (CSE_3139)<br/><b>V SEMESTER MINI PROJECT REPORT</b><br/><br/>Submitted to", subtitle_style))
+    story.append(Spacer(1, 6))
     story.append(Paragraph("MANIPAL ACADEMY OF HIGHER EDUCATION<br/>School of Computer Engineering<br/>Manipal Institute of Technology, Bengaluru<br/>B.Tech Computer Science & Engineering (Artificial Intelligence)", institution_style))
-    story.append(Spacer(1, 15))
+    story.append(Spacer(1, 6))
+    
+    # Manipal Institute of Technology Official Logo Sticker
+    if Path("docs/figures/manipal_logo.png").exists():
+        story.append(Image("docs/figures/manipal_logo.png", width=5.2*inch, height=0.69*inch))
+        story.append(Spacer(1, 10))
+
     story.append(Paragraph(
         "Submitted by:<br/><br/>"
         "<b>Dhruv Gourisaria - 245890486</b><br/>"
         "<b>Jessica Mariam Mathews - 245890380</b><br/>"
         "<b>Samarth Bangwal - 245890410</b><br/>"
-        "<b>Aadi Harnad Bhat - 245890054</b>",
+        "<b>Aadi Harnad Bhat – 245890054</b>",
         author_style
     ))
-    story.append(Spacer(1, 15))
+    story.append(Spacer(1, 8))
     story.append(Paragraph("Under the guidance of:<br/><b>Dr. Mahadevi S.</b><br/>Assistant Professor, School of Computer Engineering<br/>Manipal Institute of Technology, Bengaluru", subtitle_style))
-    story.append(Spacer(1, 40))
-    story.append(Paragraph("<b>October 2026</b>", subtitle_style))
+    story.append(Spacer(1, 8))
+    story.append(Paragraph("<b>SCHOOL OF COMPUTER ENGINEERING</b><br/><b>October 2026</b>", subtitle_style))
     story.append(PageBreak())
 
     # -------------------------------------------------------------
@@ -790,11 +796,6 @@ def build_pdf():
     # Build the PDF with NumberedCanvas
     doc.build(story, canvasmaker=NumberedCanvas)
     print(f"Built PDF successfully at: {pdf_path}")
-
-    # Copy to Report_Template (1).pdf
-    copy_path = Path("Report_Template (1).pdf")
-    shutil.copyfile(pdf_path, copy_path)
-    print(f"Copied PDF to: {copy_path}")
 
 if __name__ == "__main__":
     build_pdf()

@@ -40,5 +40,6 @@ dist/
 # Env / secrets
 .env
 
-# OS
+# OS & Office lock files
 .DS_Store
+~$*
