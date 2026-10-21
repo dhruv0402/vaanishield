@@ -220,9 +220,12 @@ def build_pdf():
     story.append(Paragraph("MANIPAL ACADEMY OF HIGHER EDUCATION<br/>School of Computer Engineering<br/>Manipal Institute of Technology, Bengaluru<br/>B.Tech Computer Science & Engineering (Artificial Intelligence)", institution_style))
     story.append(Spacer(1, 6))
     
-    # Manipal Institute of Technology Official Logo Sticker
-    if Path("docs/figures/manipal_logo.png").exists():
-        story.append(Image("docs/figures/manipal_logo.png", width=5.2*inch, height=0.69*inch))
+    # Top Manipal Institute Banner / Logo
+    if Path("docs/figures/image1.png").exists():
+        story.append(Image("docs/figures/image1.png", width=5.5*inch, height=0.70*inch))
+        story.append(Spacer(1, 10))
+    elif Path("docs/figures/manipal_logo.png").exists():
+        story.append(Image("docs/figures/manipal_logo.png", width=5.5*inch, height=0.70*inch))
         story.append(Spacer(1, 10))
 
     story.append(Paragraph(
@@ -235,7 +238,13 @@ def build_pdf():
     ))
     story.append(Spacer(1, 8))
     story.append(Paragraph("Under the guidance of:<br/><b>Dr. Mahadevi S.</b><br/>Assistant Professor, School of Computer Engineering<br/>Manipal Institute of Technology, Bengaluru", subtitle_style))
-    story.append(Spacer(1, 8))
+    story.append(Spacer(1, 10))
+
+    # Second Manipal Institute Logo / Banner as per template
+    if Path("docs/figures/image2.png").exists():
+        story.append(Image("docs/figures/image2.png", width=5.5*inch, height=0.73*inch))
+        story.append(Spacer(1, 10))
+
     story.append(Paragraph("<b>SCHOOL OF COMPUTER ENGINEERING</b><br/><b>October 2026</b>", subtitle_style))
     story.append(PageBreak())
 
