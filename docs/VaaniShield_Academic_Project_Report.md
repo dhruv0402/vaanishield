@@ -4,7 +4,11 @@
 **V SEMESTER MINI PROJECT REPORT**  
 **Institution:** School of Computer Engineering, Manipal Institute of Technology, Bengaluru, Manipal Academy of Higher Education  
 **Degree:** B.Tech Computer Science & Engineering (Artificial Intelligence)  
-**Author:** Dhruv Gourisaria  
+**Submitted by:**  
+- Dhruv Gourisaria - 245890486  
+- Jessica Mariam Mathews - 245890380  
+- Samarth Bangwal - 245890410  
+- Aadi Harnad Bhat - 245890054  
 **Under the Guidance of:** Dr. Mahadevi S., Assistant Professor, School of Computer Engineering  
 **Submission Date:** October 2026  
 

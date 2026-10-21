@@ -186,19 +186,26 @@ def build_report():
     r_inst.font.color.rgb = RGBColor(15, 23, 42)
 
     p_by = doc.add_paragraph()
-    p_by.paragraph_format.space_before = Pt(18)
-    p_by.paragraph_format.space_after = Pt(24)
+    p_by.paragraph_format.space_before = Pt(14)
+    p_by.paragraph_format.space_after = Pt(20)
     p_by.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r_by = p_by.add_run("Submitted by:\n")
+    r_by = p_by.add_run("Submitted by:\n\n")
     r_by.font.name = "Times New Roman"
     r_by.font.size = Pt(12)
     r_by.font.italic = True
     
-    r_name = p_by.add_run("DHRUV GOURISARIA\n")
-    r_name.font.name = "Times New Roman"
-    r_name.font.size = Pt(15)
-    r_name.font.bold = True
-    r_name.font.color.rgb = RGBColor(15, 23, 42)
+    members = [
+        ("Dhruv Gourisaria", "245890486"),
+        ("Jessica Mariam Mathews", "245890380"),
+        ("Samarth Bangwal", "245890410"),
+        ("Aadi Harnad Bhat", "245890054"),
+    ]
+    for idx, (m_name, m_reg) in enumerate(members):
+        r_m = p_by.add_run(f"{m_name} - {m_reg}" + ("\n" if idx < len(members) - 1 else ""))
+        r_m.font.name = "Times New Roman"
+        r_m.font.size = Pt(13)
+        r_m.font.bold = True
+        r_m.font.color.rgb = RGBColor(15, 23, 42)
 
     p_guide = doc.add_paragraph()
     p_guide.paragraph_format.space_before = Pt(12)

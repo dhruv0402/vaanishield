@@ -109,12 +109,12 @@ def build_pdf():
     author_style = ParagraphStyle(
         "CoverAuthor",
         parent=styles["Normal"],
-        fontName="Times-Bold",
-        fontSize=13,
-        leading=17,
+        fontName="Times-Roman",
+        fontSize=11.5,
+        leading=16,
         alignment=TA_CENTER,
         textColor=colors.HexColor("#0F172A"),
-        spaceAfter=20,
+        spaceAfter=16,
     )
 
     h1_style = ParagraphStyle(
@@ -218,9 +218,16 @@ def build_pdf():
     story.append(Paragraph("Advanced Artificial Intelligence (CSE_3139)<br/><b>V SEMESTER MINI PROJECT REPORT</b><br/><br/>Submitted to", subtitle_style))
     story.append(Spacer(1, 10))
     story.append(Paragraph("MANIPAL ACADEMY OF HIGHER EDUCATION<br/>School of Computer Engineering<br/>Manipal Institute of Technology, Bengaluru<br/>B.Tech Computer Science & Engineering (Artificial Intelligence)", institution_style))
-    story.append(Spacer(1, 20))
-    story.append(Paragraph("Submitted by:<br/><font size='14'><b>DHRUV GOURISARIA</b></font>", author_style))
-    story.append(Spacer(1, 20))
+    story.append(Spacer(1, 15))
+    story.append(Paragraph(
+        "Submitted by:<br/><br/>"
+        "<b>Dhruv Gourisaria - 245890486</b><br/>"
+        "<b>Jessica Mariam Mathews - 245890380</b><br/>"
+        "<b>Samarth Bangwal - 245890410</b><br/>"
+        "<b>Aadi Harnad Bhat - 245890054</b>",
+        author_style
+    ))
+    story.append(Spacer(1, 15))
     story.append(Paragraph("Under the guidance of:<br/><b>Dr. Mahadevi S.</b><br/>Assistant Professor, School of Computer Engineering<br/>Manipal Institute of Technology, Bengaluru", subtitle_style))
     story.append(Spacer(1, 40))
     story.append(Paragraph("<b>October 2026</b>", subtitle_style))
