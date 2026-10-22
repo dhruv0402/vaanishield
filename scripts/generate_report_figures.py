@@ -24,54 +24,148 @@ plt.rcParams.update({
 })
 
 # -------------------------------------------------------------
-# Figure 1: Hierarchical Multi-Stream System Architecture
+# Figure 1: Hierarchical Multi-Stream System Architecture (Publication-Grade)
 # -------------------------------------------------------------
-fig, ax = plt.subplots(figsize=(10, 5), dpi=300)
+fig, ax = plt.subplots(figsize=(11.5, 6.2), dpi=300)
 ax.axis("off")
 
-def draw_box(x, y, w, h, text, color="#2563EB", subtext=""):
-    rect = patches.FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.03", 
-                                  facecolor=color, edgecolor="#1E293B", linewidth=1.5, alpha=0.92)
-    ax.add_patch(rect)
-    ax.text(x + w/2, y + h/2 + (0.04 if subtext else 0), text, color="white", weight="bold", 
-            ha="center", va="center", fontsize=10.5)
-    if subtext:
-        ax.text(x + w/2, y + h/2 - 0.06, subtext, color="#E2E8F0", fontsize=8, 
-                ha="center", va="center")
+# Canvas styling with subtle background
+fig.patch.set_facecolor("#FAFCFF")
+ax.set_facecolor("#FAFCFF")
 
-draw_box(0.02, 0.65, 0.22, 0.22, "Input Audio\n(PCM / G.711 / AMR)", color="#1E293B", subtext="16 kHz Call Stream")
-draw_box(0.30, 0.70, 0.28, 0.22, "Acoustic Flux\nChangepoint Detection", color="#2563EB", subtext="Spectral Flux & ΔMFCC")
-draw_box(0.64, 0.70, 0.32, 0.22, "Boundary Feature Stream\n(Prosodic & Phase Seams)", color="#0D9488", subtext="ΔF0, ΔEnergy, ΔPhase, ΔFlux")
+# Helper to draw stream region background panels
+def draw_panel(x, y, w, h, title, fill_color, border_color):
+    panel = patches.FancyBboxPatch(
+        (x, y), w, h, boxstyle="round,pad=0.015",
+        facecolor=fill_color, edgecolor=border_color, linewidth=1.2, linestyle="--", alpha=0.6, zorder=1
+    )
+    ax.add_patch(panel)
+    ax.text(x + 0.02, y + h - 0.035, title, fontsize=8.5, weight="bold", color=border_color, va="top", ha="left", zorder=2)
 
-draw_box(0.30, 0.38, 0.28, 0.22, "Self-Supervised\nSpeech Foundation (SSL)", color="#7C3AED", subtext="WavLM / XLSR (1024-D)")
-draw_box(0.64, 0.38, 0.32, 0.22, "Adaptive Regularized\nSubspace Nulling (ARS-SNAP)", color="#D97706", subtext="P = I - Φ(ΦᵀΦ + λI)⁻¹Φᵀ")
+# Helper to draw module cards
+def draw_card(x, y, w, h, title, subtitle="", badge="", header_color="#2563EB", bg_color="#FFFFFF", border_color="#CBD5E1"):
+    # Main card box
+    box = patches.FancyBboxPatch(
+        (x, y), w, h, boxstyle="round,pad=0.012",
+        facecolor=bg_color, edgecolor=border_color, linewidth=1.4, zorder=3
+    )
+    ax.add_patch(box)
+    
+    # Header bar accent
+    header_bar = patches.FancyBboxPatch(
+        (x, y + h - 0.055), w, 0.055, boxstyle="round,pad=0.008",
+        facecolor=header_color, edgecolor="none", zorder=4
+    )
+    ax.add_patch(header_bar)
+    
+    # Title text
+    ax.text(x + w/2, y + h - 0.028, title, color="white", weight="bold", ha="center", va="center", fontsize=9.2, zorder=5)
+    
+    # Badge (if any)
+    if badge:
+        ax.text(x + w - 0.015, y + h + 0.018, badge, color="#0F172A", weight="bold", ha="right", va="bottom",
+                fontsize=7.2, bbox=dict(boxstyle="round,pad=0.2", fc="#E0F2FE", ec="#0284C7", lw=0.8), zorder=6)
+    
+    # Subtitle / content
+    if subtitle:
+        ax.text(x + w/2, y + (h - 0.055)/2, subtitle, color="#334155", ha="center", va="center", fontsize=8.0, linespacing=1.25, zorder=5)
 
-draw_box(0.30, 0.06, 0.66, 0.22, "Dual-Mode Monolingual Router (when N_cs = 0)", color="#475569", subtext="HNR (Mean/Std), Spectral Flatness, Macro Energy Variance, ZCR Variance")
+# Helper to draw professional smooth connecting arrows
+def draw_conn(x1, y1, x2, y2, label="", color="#475569", style="-|>", rad=0.0, lw=1.8):
+    connectionstyle = f"arc3,rad={rad}" if rad != 0.0 else "arc3"
+    arrow = patches.FancyArrowPatch(
+        (x1, y1), (x2, y2),
+        connectionstyle=connectionstyle,
+        arrowstyle=style,
+        mutation_scale=13,
+        color=color,
+        linewidth=lw,
+        zorder=7
+    )
+    ax.add_patch(arrow)
+    if label:
+        mx, my = (x1 + x2)/2, (y1 + y2)/2
+        ax.text(mx, my + 0.02, label, fontsize=7.2, color="#0F172A", weight="bold", ha="center", va="center",
+                bbox=dict(boxstyle="round,pad=0.15", fc="#FFFFFF", ec="#94A3B8", lw=0.6, alpha=0.9), zorder=8)
 
-draw_box(1.02, 0.40, 0.24, 0.42, "Unified Late Fusion\n& Banking Calibration", color="#B91C1C", subtext="Neyman-Pearson Tiers:\nAllow / Review / Block")
+# 1. Background Domain Panels
+draw_panel(0.24, 0.54, 0.44, 0.42, "STREAM 1: BOUNDARY-LOCAL MICRO-ACOUSTIC SEAM STREAM (Prosody & Phase Dynamics)", "#F0FDF4", "#059669")
+draw_panel(0.24, 0.04, 0.44, 0.46, "STREAM 2: SEMANTIC-ACOUSTIC FOUNDATION & SPEAKER-NULLING (ARS-SNAP)", "#FAF5FF", "#7C3AED")
+draw_panel(0.72, 0.18, 0.38, 0.64, "HIERARCHICAL FUSION, ONNX ENGINE & NEYMAN-PEARSON TIERS", "#FFF7ED", "#C2410C")
 
-def draw_arrow(x1, y1, x2, y2):
-    ax.annotate("", xy=(x2, y2), xytext=(x1, y1),
-                arrowprops=dict(arrowstyle="->", color="#334155", lw=2, mutation_scale=15))
+# 2. Stage Cards
+# Input Ingestion
+draw_card(0.02, 0.38, 0.18, 0.28, "INGESTION & CODEC",
+          "Raw PCM / G.711 / AMR\n16 kHz Telephony Audio\nSpectral Denoising (38x)\nSilence Trimming & Normalization",
+          badge="TELEPHONY IN", header_color="#0F172A", bg_color="#FFFFFF", border_color="#334155")
 
-draw_arrow(0.24, 0.76, 0.30, 0.76)
-draw_arrow(0.24, 0.70, 0.30, 0.49)
-draw_arrow(0.24, 0.66, 0.30, 0.17)
+# Stream 1 Cards
+draw_card(0.26, 0.58, 0.18, 0.32, "BOUNDARY LOCALIZER",
+          "Acoustic Flux Tracking\nSliding 40ms MFCC Delta\nTemporal NMS Suppressor\nBilateral Window (±100ms)",
+          badge="ΔMFCC / Flux", header_color="#059669", border_color="#10B981")
 
-draw_arrow(0.58, 0.81, 0.64, 0.81)
-draw_arrow(0.58, 0.49, 0.64, 0.49)
+draw_card(0.48, 0.58, 0.18, 0.32, "ACOUSTIC SEAM ENGINE",
+          "Vectorized YIN Pitch (34ms)\nΔF0 Jumps & Glottal Velocity\nShort-time Energy Steps ΔE\nSpectral Flux & Phase Resets",
+          badge="14-D Vector", header_color="#0D9488", border_color="#14B8A6")
 
-draw_arrow(0.96, 0.81, 1.02, 0.65)
-draw_arrow(0.96, 0.49, 1.02, 0.55)
-draw_arrow(0.96, 0.17, 1.02, 0.45)
+# Stream 2 Cards
+draw_card(0.26, 0.20, 0.18, 0.26, "SSL SPEECH ENCODER",
+          "WavLM / XLSR Foundation\nFrozen Pretrained Weights\nMulti-resolution Spectrogram\n1024-D Frame Embeddings",
+          badge="WavLM / XLSR", header_color="#7C3AED", border_color="#8B5CF6")
 
-ax.set_xlim(-0.02, 1.30)
-ax.set_ylim(0.0, 1.0)
-fig.suptitle("Figure 1: VaaniShield End-to-End Hierarchical Multi-Stream Architecture", fontsize=13, y=0.98, weight="bold")
+draw_card(0.48, 0.20, 0.18, 0.26, "ARS-SNAP PROJECTION",
+          "Soft-Nulling Speaker Covariance\nP = I - V diag(α/(σ+λ)) Vᵀ\nVocoder Overfitting Block\nIn-Memory Linear Matrix",
+          badge="128-D Nulled", header_color="#9333EA", border_color="#A855F7")
+
+# Monolingual Fallback Box
+draw_card(0.26, 0.07, 0.40, 0.10, "DUAL-MODE ROUTER (when Switch Points N_cs = 0)",
+          "Global HNR (Mean/Std) • Spectral Flatness • Shimmer/Jitter • Long-Term Energy Variance",
+          badge="Zero-Collapse Prevention", header_color="#475569", bg_color="#F8FAFC", border_color="#64748B")
+
+# Late Fusion & Banking Engine Cards
+draw_card(0.74, 0.48, 0.17, 0.28, "DUAL-STREAM FUSION",
+          "Feature Concatenation\n14-D Seam + 128-D Nulled\nTemperature-Scaled Sigmoid\nZero-Pickle Runtime Engine",
+          badge="142-D Fused", header_color="#EA580C", border_color="#F97316")
+
+draw_card(0.74, 0.22, 0.17, 0.22, "ONNX INFERENCE",
+          "Pure ONNX SIMD Runtime\n0.14 ms Microsecond Latency\nSHA-256 Anti-Tamper Check\nZero-GIL Concurrency",
+          badge="0.14 ms SIMD", header_color="#DC2626", border_color="#EF4444")
+
+# Decision Action Tiers (Final Output)
+draw_card(0.93, 0.26, 0.16, 0.48, "OPERATIONAL TIERS",
+          "TIER 1 (p < 0.25):\nALLOW_VERIFIED\n(Frictionless Pass)\n\nTIER 2 (0.25 ≤ p < 0.70):\nSTEP_UP_AUTH\n(SMS / OTP Challenge)\n\nTIER 3 (p ≥ 0.70):\nBLOCK_AND_ALERT\n(Call Severed & Tier-3 Ops)",
+          badge="Neyman-Pearson", header_color="#991B1B", bg_color="#FEF2F2", border_color="#DC2626")
+
+# 3. Connection Arrows (Precise routing)
+# From Ingestion to Stream 1, Stream 2, and Fallback
+draw_conn(0.20, 0.56, 0.26, 0.74, label="Waveform", color="#059669", rad=0.08)
+draw_conn(0.20, 0.46, 0.26, 0.33, label="Waveform", color="#7C3AED", rad=-0.08)
+draw_conn(0.12, 0.38, 0.26, 0.12, label="Monolingual Routing", color="#475569", rad=-0.22)
+
+# Stream 1 Inter-connection
+draw_conn(0.44, 0.74, 0.48, 0.74, label="Bilateral Windows", color="#059669")
+
+# Stream 2 Inter-connection
+draw_conn(0.44, 0.33, 0.48, 0.33, label="1024-D Embs", color="#7C3AED")
+
+# To Dual-Stream Fusion
+draw_conn(0.66, 0.74, 0.74, 0.64, label="14-D Seam Vector", color="#059669", rad=-0.08)
+draw_conn(0.66, 0.33, 0.74, 0.58, label="128-D Nulled Vector", color="#7C3AED", rad=0.08)
+draw_conn(0.66, 0.12, 0.74, 0.52, label="Fallback Features", color="#475569", rad=0.15)
+
+# Fusion to ONNX and Decision Tiers
+draw_conn(0.825, 0.48, 0.825, 0.44, label="Tensors", color="#EA580C")
+draw_conn(0.91, 0.33, 0.93, 0.50, label="P(Spoof | x)", color="#DC2626")
+
+ax.set_xlim(-0.01, 1.11)
+ax.set_ylim(0.01, 1.01)
+
+fig.suptitle("Figure 1: VaaniShield End-to-End Hierarchical Multi-Stream Architecture", fontsize=13, y=0.985, weight="bold")
 plt.tight_layout()
 fig.savefig(out_dir / "fig1_system_architecture.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
-print("Saved Figure 1.")
+print("Saved redesigned publication-grade Figure 1.")
+
 
 # -------------------------------------------------------------
 # Figure 2: Code-Switching Acoustic Seams (Expanded Y-limits, Distinct Legend)
