@@ -67,6 +67,51 @@ def add_body_paragraph(doc, text, bold_prefix="", space_after=6, italic=False):
     r.font.color.rgb = RGBColor(30, 41, 59)
     return p
 
+def add_equation_paragraph(doc, eq_text, eq_number):
+    """Adds a formal publication-style equation table with centered equation and right-aligned number."""
+    table = doc.add_table(rows=1, cols=2)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.autofit = False
+    
+    # Remove borders
+    for cell in table.rows[0].cells:
+        tcPr = cell._tc.get_or_add_tcPr()
+        tcBorders = OxmlElement('w:tcBorders')
+        for border_name in ['top', 'left', 'bottom', 'right']:
+            b = OxmlElement(f'w:{border_name}')
+            b.set(qn('w:val'), 'none')
+            tcBorders.append(b)
+        tcPr.append(tcBorders)
+    
+    table.rows[0].cells[0].width = Inches(5.6)
+    table.rows[0].cells[1].width = Inches(0.9)
+    
+    # Equation text paragraph
+    p0 = table.rows[0].cells[0].paragraphs[0]
+    p0.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p0.paragraph_format.space_before = Pt(3)
+    p0.paragraph_format.space_after = Pt(3)
+    r0 = p0.add_run(eq_text)
+    r0.font.name = "Times New Roman"
+    r0.font.size = Pt(11.5)
+    r0.font.color.rgb = RGBColor(15, 23, 42)
+    
+    # Equation number paragraph
+    p1 = table.rows[0].cells[1].paragraphs[0]
+    p1.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p1.paragraph_format.space_before = Pt(3)
+    p1.paragraph_format.space_after = Pt(3)
+    r1 = p1.add_run(eq_number)
+    r1.font.name = "Times New Roman"
+    r1.font.size = Pt(11.5)
+    r1.font.color.rgb = RGBColor(15, 23, 42)
+    
+    # Spacer paragraph after equation
+    p_sp = doc.add_paragraph()
+    p_sp.paragraph_format.space_before = Pt(0)
+    p_sp.paragraph_format.space_after = Pt(2)
+    return table
+
 def add_bullet_point(doc, bold_prefix, text):
     p = doc.add_paragraph(style="List Bullet" if "List Bullet" in [s.name for s in doc.styles] else "Normal")
     p.paragraph_format.space_before = Pt(0)
@@ -486,30 +531,40 @@ def build_report():
         "To identify language transition boundaries without relying on computationally expensive speech-to-text transcriptions, "
         "we compute the spectral flux SF(t) across successive STFT frames:"
     )
+    add_equation_paragraph(
+        doc,
+        "SF(t) = ∑_{k=1}^K H(|X(t, k)| − |X(t−1, k)|)²",
+        "(1)"
+    )
     add_body_paragraph(
         doc,
-        "    SF(t) = ∑_k H( |X(t, k)| - |X(t-1, k)| )^2\n"
-        "where H(v) = (v + |v|)/2 is the half-wave rectification operator and X(t, k) is the short-time Fourier transform. Peaks in SF(t) "
-        "exceeding an adaptive threshold define candidate code-switch points {t_cs}."
+        "where H(v) = (v + |v|)/2 is the half-wave rectification operator, X(t, k) is the complex short-time Fourier transform magnitude at frame t and frequency bin k, and K denotes the total frequency bins. Prominent peaks in SF(t) exceeding an adaptive threshold define candidate code-switch transition timestamps {t_cs}."
     )
 
     add_body_paragraph(
         doc,
         "B. Boundary Prosodic and Phase Seam Extraction:\n"
-        "For each detected transition point t_cs, a symmetric window W = [t_cs - Δ, t_cs + Δ] (Δ = 250 ms) is partitioned into pre-switch (W_pre) "
-        "and post-switch (W_post) segments. Across this boundary, we extract a 16-dimensional acoustic seam vector capturing pitch jump, "
-        "energy step, formant dispersion, and phase reset (Table 2)."
+        "For each detected transition point t_cs, a symmetric analysis window W is established around the boundary:"
+    )
+    add_equation_paragraph(
+        doc,
+        "W = [t_cs − Δ, t_cs + Δ],      where   Δ = 250 ms",
+        "(2)"
+    )
+    add_body_paragraph(
+        doc,
+        "The window is partitioned into pre-switch (W_pre = [t_cs − Δ, t_cs]) and post-switch (W_post = [t_cs, t_cs + Δ]) segments. Across this boundary, we extract a 16-dimensional acoustic seam vector capturing fundamental frequency perturbation, energy discontinuity, spectral tilt shift, and non-linear phase desynchronization (Table 2)."
     )
 
     t2_headers = ["Feature Index", "Acoustic Metric Name", "Mathematical Formulation", "Physical Anomaly Targeted"]
     t2_data = [
-        ("0–1", "ΔF0 (Absolute & Relative Jump)", "|F0_post - F0_pre|, (F0_post - F0_pre) / F0_pre", "Pitch contour discontinuity across vocoder frames"),
-        ("2–3", "ΔEnergy (RMS Step & Log Ratio)", "|E_post - E_pre|, 10 * log10(E_post / E_pre)", "Sudden volume / amplitude step artifact"),
-        ("4–5", "ΔSpectral Flux Step", "SF(t_post) - SF(t_pre)", "Spectral envelope tilt dislocation"),
-        ("6–7", "Formant Phase Reset Δϕ", "arg( X_post(F1) ) - arg( X_pre(F1) )", "Non-linear phase desynchronization at stitch boundary"),
-        ("8–9", "Boundary Spectral Centroid Shift", "SC_post - SC_pre", "Timbral brightness jump"),
-        ("10–11", "Boundary Bandwidth Deviation", "BW_post - BW_pre", "Formant bandwidth broadening"),
-        ("12–15", "Summary Statistics (Mean, Max, Std)", "Pooled segment aggregations", "Multi-boundary utterance-level cohesion"),
+        ("0–1", "ΔF₀ (Absolute & Relative Jump)", "|F₀,post − F₀,pre|,  ΔF₀ / F₀,pre", "Pitch contour discontinuity across vocoder frames"),
+        ("2–3", "ΔE (RMS Step & Log Ratio)", "|E_post − E_pre|,  10 log₁₀(E_post / E_pre)", "Sudden volume / amplitude step artifact"),
+        ("4–5", "ΔSpectral Flux Step", "SF(t_post) − SF(t_pre)", "Spectral envelope tilt dislocation"),
+        ("6–7", "Formant Phase Reset Δϕ", "arg( X_post(F₁) ) − arg( X_pre(F₁) )", "Non-linear phase desynchronization at stitch boundary"),
+        ("8–9", "Boundary Spectral Centroid Shift ΔSC", "SC_post − SC_pre", "Timbral brightness jump across language seam"),
+        ("10–11", "Boundary Bandwidth Deviation ΔBW", "BW_post − BW_pre", "Formant bandwidth broadening artifact"),
+        ("12–15", "Summary Statistics (μ, max, σ)", "Pooled segment aggregations", "Multi-boundary utterance-level cohesion"),
     ]
     add_styled_table(doc, t2_headers, t2_data, [1.0, 1.8, 1.8, 1.9])
     add_caption(doc, "Table 2: Empirical Boundary Seam Vector Formulations (16-D Feature Space).")
@@ -523,22 +578,36 @@ def build_report():
         "C. Dual-Mode Monolingual Routing:\n"
         "When an utterance contains zero code-switching points (N_cs = 0), naive boundary detectors collapse into an uninformative zero vector. "
         "VaaniShield introduces an automatic Dual-Mode Stream Router that dynamically switches to global macro-acoustic metrics when N_cs = 0:\n"
-        "    • Harmonics-to-Noise Ratio (HNR): Measures glottal excitation periodic energy relative to aspiration noise.\n"
+        "    • Harmonics-to-Noise Ratio (HNR): Measures glottal excitation periodic energy relative to aspiration noise (mean and standard deviation).\n"
         "    • Spectral Flatness Measure (SFM): Quantifies the tonality versus noisiness of the audio spectrum.\n"
-        "    • Macro Energy Variance: Detects unnatural unnatural dynamic range compression typical of neural speech synthesizers.\n"
+        "    • Macro Energy Variance: Detects unnatural dynamic range compression typical of neural speech synthesizers.\n"
         "    • Zero-Crossing Rate (ZCR) Variance: Measures micro-phonetic temporal stability across unvoiced phonemes."
     )
 
     add_body_paragraph(
         doc,
         "D. Adaptive Regularized Subspace Projection (ARS-SNAP):\n"
-        "To prevent speaker identity biometrics from biasing deepfake classification, we project the self-supervised embedding z ∈ R^D (D=1024) "
-        "into a speaker-nulled subspace. Standard SNAP applies hard orthogonal projection:\n"
-        "    P_hard = I - Φ (Φ^T Φ)^(-1) Φ^T\n"
-        "where Φ is the basis matrix of the top-k speaker subspace components. However, on unseen commercial voice cloners, hard projection "
-        "causes mathematical singularity and strips vital discriminative signal. VaaniShield introduces Adaptive Regularized Subspace Projection (ARS-SNAP):\n"
-        "    P_ARS = I - Φ (Φ^T Φ + λ I)^(-1) Φ^T\n"
-        "where λ > 0 is a Tikhonov soft-shrinkage regularization parameter (empirically tuned to λ = 0.05 on validation splits). ARS-SNAP smoothly "
+        "To prevent speaker identity biometrics from biasing deepfake classification, we project the self-supervised embedding z ∈ ℝᴰ (D=1024) "
+        "into a speaker-nulled subspace. Standard SNAP applies hard orthogonal projection:"
+    )
+    add_equation_paragraph(
+        doc,
+        "P_hard = I − Φ (Φᵀ Φ)⁻¹ Φᵀ",
+        "(3)"
+    )
+    add_body_paragraph(
+        doc,
+        "where Φ is the basis matrix formed from the top-k speaker subspace eigenvectors. However, on unseen commercial voice cloners, hard projection "
+        "causes matrix near-singularity and strips vital discriminative signal. VaaniShield introduces Adaptive Regularized Subspace Projection (ARS-SNAP):"
+    )
+    add_equation_paragraph(
+        doc,
+        "P_ARS = I − Φ (Φᵀ Φ + λ I)⁻¹ Φᵀ",
+        "(4)"
+    )
+    add_body_paragraph(
+        doc,
+        "where λ > 0 is a Tikhonov soft-shrinkage regularization parameter (empirically calibrated to λ = 0.05 on validation splits). ARS-SNAP smoothly "
         "attenuates dominant speaker eigenvalues while preserving subtle vocoder synthesis artifacts."
     )
 
@@ -584,7 +653,7 @@ def build_report():
     add_bullet_point(doc, "GIL-Free Vectorized YIN Pitch Tracker", "Replaced Praat Parselmouth C-extensions with a pure NumPy vectorized YIN algorithm utilizing O(N log N) FFT autocorrelation and parabolic peak interpolation. This eliminates Python Global Interpreter Lock (GIL) contention, enabling seamless multi-threaded scaling on telephony servers.")
     add_bullet_point(doc, "Vectorized PyTorch Spectral Denoising", "Refactored audio window spectral subtraction from unvectorized Librosa loops into batched PyTorch STFT/iSTFT operations, achieving a 38x speedup (0.88 ms vs 33.6 ms per boundary window).")
     add_bullet_point(doc, "Zero-Pickle ONNX Security", "Eliminated Python pickle deserialization risks by exporting model weights into a pure NumPy container (model_parameters.npz) and an end-to-end ONNX inference graph (vaanishield_end_to_end.onnx) validated via mandatory SHA-256 cryptographic digests.")
-    add_bullet_point(doc, "Neyman-Pearson Banking Calibration", "Configured asymmetric decision boundaries tailored for financial fraud operations: Scores < 0.38 are tagged ALLOW_VERIFIED (FAR ≤ 0.1%, zero friction); 0.38 ≤ Score < 0.58 trigger STEP_UP_AUTH (out-of-band verification); and Scores ≥ 0.58 trigger BLOCK_AND_ALERT.")
+    add_bullet_point(doc, "Neyman-Pearson Banking Calibration", "Configured asymmetric decision boundaries tailored for financial fraud operations: Scores s < τ_review (0.38) are tagged ALLOW_VERIFIED (FAR ≤ 0.1%, zero friction); τ_review ≤ s < τ_block (0.58) trigger STEP_UP_AUTH (out-of-band biometric challenge); and Scores s ≥ τ_block (0.58) trigger BLOCK_AND_ALERT.")
 
     add_styled_heading(doc, "4.2 Empirical Results and Discussion Across Benchmark Regimes", level=2)
     add_body_paragraph(
@@ -593,17 +662,17 @@ def build_report():
         "Table 4 summarizes the empirical Equal Error Rates (EER), ROC-AUC, classification accuracy, and 95% Wilson confidence intervals."
     )
 
-    t4_headers = ["Benchmark Regime", "Sample Count (N)", "Hard SNAP EER (λ=0.0)", "ARS-SNAP EER (λ=0.05)", "Relative EER Drop", "ROC-AUC", "95% Wilson Confidence Interval"]
+    t4_headers = ["Benchmark Regime", "Sample Count (N)", "Hard SNAP EER (λ = 0.0)", "ARS-SNAP EER (λ = 0.05)", "Relative EER Drop", "ROC-AUC", "95% Wilson Confidence Interval"]
     t4_data = [
         ("Overall Enterprise Corpus", "1,600", "23.12%", "23.12%", "+0.0%", "0.838", "[0.2112, 0.2525] (±2.07%)"),
-        ("In-Domain Test Set", "350", "30.57%", "31.43%", "-2.8%", "0.742", "[0.2679, 0.3647] (±4.84%)"),
+        ("In-Domain Test Set", "350", "30.57%", "31.43%", "−2.8%", "0.742", "[0.2679, 0.3647] (±4.84%)"),
         ("Cross-Dialect (Telugu te-en)", "400", "11.50%", "11.00%", "+4.3%", "0.942", "[0.0830, 0.1445] (±3.08%)"),
         ("Out-of-Domain Commercial TTS", "470", "21.87%", "20.62%", "+5.7%", "0.865", "[0.1722, 0.2453] (±3.65%)"),
-        ("Telephony Codecs (G.711 / AMR)", "640", "21.25%", "21.72%", "-2.2%", "0.849", "[0.1870, 0.2508] (±3.19%)"),
-        ("Packet Loss Telephony", "320", "18.75%", "20.94%", "-11.7%", "0.858", "[0.1684, 0.2573] (±4.44%)"),
-        ("Ambient Noise Telephony", "320", "30.31%", "30.63%", "-1.1%", "0.751", "[0.2583, 0.3588] (±5.02%)"),
+        ("Telephony Codecs (G.711 / AMR)", "640", "21.25%", "21.72%", "−2.2%", "0.849", "[0.1870, 0.2508] (±3.19%)"),
+        ("Packet Loss Telephony", "320", "18.75%", "20.94%", "−11.7%", "0.858", "[0.1684, 0.2573] (±4.44%)"),
+        ("Ambient Noise Telephony", "320", "30.31%", "30.63%", "−1.1%", "0.751", "[0.2583, 0.3588] (±5.02%)"),
         ("Demographic: Female Callers", "800", "23.63%", "23.00%", "+2.7%", "0.839", "[0.2022, 0.2604] (±2.91%)"),
-        ("Demographic: Male Callers", "800", "23.75%", "23.88%", "-0.5%", "0.837", "[0.2105, 0.2695] (±2.95%)"),
+        ("Demographic: Male Callers", "800", "23.75%", "23.88%", "−0.5%", "0.837", "[0.2105, 0.2695] (±2.95%)"),
     ]
     add_styled_table(doc, t4_headers, t4_data, [1.3, 0.7, 1.0, 1.0, 0.9, 0.8, 1.3])
     add_caption(doc, "Table 4: Empirical Generalization Across 8 Evaluation Regimes (ARS-SNAP vs. Hard SNAP).")

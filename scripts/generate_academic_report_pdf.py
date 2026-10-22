@@ -8,6 +8,8 @@ from pathlib import Path
 import os
 import shutil
 
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.units import inch
@@ -17,6 +19,35 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak, KeepTogether, HRFlowable
 )
 from reportlab.pdfgen import canvas
+
+# Register Times New Roman TrueType fonts for native Unicode mathematical symbol rendering
+FONT_REGULAR = "Times-Roman"
+FONT_BOLD = "Times-Bold"
+FONT_ITALIC = "Times-Italic"
+FONT_BOLD_ITALIC = "Times-BoldItalic"
+
+ttf_paths = [
+    ("/System/Library/Fonts/Supplemental/Times New Roman.ttf", "TNR"),
+    ("/System/Library/Fonts/Supplemental/Times New Roman Bold.ttf", "TNR-Bold"),
+    ("/System/Library/Fonts/Supplemental/Times New Roman Italic.ttf", "TNR-Italic"),
+    ("/System/Library/Fonts/Supplemental/Times New Roman Bold Italic.ttf", "TNR-BoldItalic"),
+]
+
+fonts_registered = True
+for path_str, font_alias in ttf_paths:
+    if os.path.exists(path_str):
+        try:
+            pdfmetrics.registerFont(TTFont(font_alias, path_str))
+        except Exception:
+            fonts_registered = False
+    else:
+        fonts_registered = False
+
+if fonts_registered:
+    FONT_REGULAR = "TNR"
+    FONT_BOLD = "TNR-Bold"
+    FONT_ITALIC = "TNR-Italic"
+    FONT_BOLD_ITALIC = "TNR-BoldItalic"
 
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -41,7 +72,7 @@ class NumberedCanvas(canvas.Canvas):
             return
 
         self.saveState()
-        self.setFont("Times-Roman", 9)
+        self.setFont(FONT_REGULAR, 9)
         self.setFillColor(colors.HexColor("#475569"))
 
         # Running Header
@@ -72,11 +103,11 @@ def build_pdf():
 
     styles = getSampleStyleSheet()
     
-    # Custom Typography Styles
+    # Custom Typography Styles using TrueType Times New Roman
     title_style = ParagraphStyle(
         "CoverTitle",
         parent=styles["Normal"],
-        fontName="Times-Bold",
+        fontName=FONT_BOLD,
         fontSize=18,
         leading=22,
         alignment=TA_CENTER,
@@ -87,7 +118,7 @@ def build_pdf():
     subtitle_style = ParagraphStyle(
         "CoverSubtitle",
         parent=styles["Normal"],
-        fontName="Times-Roman",
+        fontName=FONT_REGULAR,
         fontSize=12,
         leading=16,
         alignment=TA_CENTER,
@@ -98,7 +129,7 @@ def build_pdf():
     institution_style = ParagraphStyle(
         "CoverInstitution",
         parent=styles["Normal"],
-        fontName="Times-Bold",
+        fontName=FONT_BOLD,
         fontSize=13,
         leading=17,
         alignment=TA_CENTER,
@@ -109,7 +140,7 @@ def build_pdf():
     author_style = ParagraphStyle(
         "CoverAuthor",
         parent=styles["Normal"],
-        fontName="Times-Roman",
+        fontName=FONT_REGULAR,
         fontSize=11.5,
         leading=16,
         alignment=TA_CENTER,
@@ -120,7 +151,7 @@ def build_pdf():
     h1_style = ParagraphStyle(
         "Heading1_Custom",
         parent=styles["Heading1"],
-        fontName="Times-Bold",
+        fontName=FONT_BOLD,
         fontSize=15,
         leading=19,
         textColor=colors.HexColor("#0F172A"),
@@ -132,7 +163,7 @@ def build_pdf():
     h2_style = ParagraphStyle(
         "Heading2_Custom",
         parent=styles["Heading2"],
-        fontName="Times-Bold",
+        fontName=FONT_BOLD,
         fontSize=12.5,
         leading=16,
         textColor=colors.HexColor("#1E293B"),
@@ -144,7 +175,7 @@ def build_pdf():
     body_style = ParagraphStyle(
         "Body_Custom",
         parent=styles["BodyText"],
-        fontName="Times-Roman",
+        fontName=FONT_REGULAR,
         fontSize=10.5,
         leading=14.5,
         alignment=TA_JUSTIFY,
@@ -155,7 +186,7 @@ def build_pdf():
     bullet_style = ParagraphStyle(
         "Bullet_Custom",
         parent=styles["Normal"],
-        fontName="Times-Roman",
+        fontName=FONT_REGULAR,
         fontSize=10,
         leading=14,
         leftIndent=15,
@@ -168,7 +199,7 @@ def build_pdf():
     caption_style = ParagraphStyle(
         "Caption_Custom",
         parent=styles["Italic"],
-        fontName="Times-Italic",
+        fontName=FONT_ITALIC,
         fontSize=9.5,
         leading=13,
         alignment=TA_CENTER,
@@ -180,7 +211,7 @@ def build_pdf():
     table_cell_style = ParagraphStyle(
         "TableCell",
         parent=styles["Normal"],
-        fontName="Times-Roman",
+        fontName=FONT_REGULAR,
         fontSize=8.5,
         leading=11.5,
         alignment=TA_CENTER,
@@ -190,7 +221,7 @@ def build_pdf():
     table_cell_left = ParagraphStyle(
         "TableCellLeft",
         parent=styles["Normal"],
-        fontName="Times-Roman",
+        fontName=FONT_REGULAR,
         fontSize=8.5,
         leading=11.5,
         alignment=TA_LEFT,
@@ -200,12 +231,49 @@ def build_pdf():
     table_hdr_style = ParagraphStyle(
         "TableHdr",
         parent=styles["Normal"],
-        fontName="Times-Bold",
+        fontName=FONT_BOLD,
         fontSize=9,
         leading=12,
         alignment=TA_CENTER,
         textColor=colors.white,
     )
+
+    eq_style = ParagraphStyle(
+        "Equation_Centered",
+        parent=styles["Normal"],
+        fontName=FONT_REGULAR,
+        fontSize=11,
+        leading=15,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor("#0F172A"),
+    )
+
+    eq_num_style = ParagraphStyle(
+        "Equation_Number",
+        parent=styles["Normal"],
+        fontName=FONT_REGULAR,
+        fontSize=10.5,
+        leading=15,
+        alignment=TA_RIGHT,
+        textColor=colors.HexColor("#0F172A"),
+    )
+
+    def format_display_equation(eq_text, eq_number):
+        """Creates an academic publication-standard display equation row with right-aligned numbering."""
+        tbl = Table(
+            [[Paragraph(eq_text, eq_style), Paragraph(eq_number, eq_num_style)]],
+            colWidths=[5.6 * inch, 0.9 * inch],
+        )
+        tbl.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (0, 0), (0, 0), "CENTER"),
+            ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        return tbl
 
     story = []
 
@@ -533,28 +601,46 @@ def build_pdf():
         story.append(Paragraph("Figure 1: VaaniShield End-to-End Hierarchical Multi-Stream Architecture.", caption_style))
 
     story.append(Paragraph(
-        "<b>A. Acoustic Flux Changepoint Localization:</b> To identify language transition boundaries without relying on computationally expensive speech-to-text transcriptions, we compute the spectral flux SF(t) across successive STFT frames:<br/>"
-        "&nbsp;&nbsp;&nbsp;&nbsp;<i>SF(t) = ∑_k H( |X(t, k)| - |X(t-1, k)| )²</i><br/>"
-        "where H(v) = (v + |v|)/2 is the half-wave rectification operator. Peaks exceeding an adaptive threshold define candidate code-switch points {t_cs}.",
+        "<b>A. Acoustic Flux Changepoint Localization:</b> To identify language transition boundaries without relying on computationally expensive speech-to-text transcriptions, we compute the spectral flux <i>SF</i>(<i>t</i>) across successive STFT frames:",
+        body_style
+    ))
+    story.append(Spacer(1, 2))
+    story.append(format_display_equation(
+        "<i>SF</i>(<i>t</i>) = ∑<sub><i>k</i>=1</sub><sup><i>K</i></sup> <i>H</i>(|<i>X</i>(<i>t</i>, <i>k</i>)| − |<i>X</i>(<i>t</i>−1, <i>k</i>)|)<sup>2</sup>",
+        "(1)"
+    ))
+    story.append(Spacer(1, 2))
+    story.append(Paragraph(
+        "where <i>H</i>(<i>v</i>) = (<i>v</i> + |<i>v</i>|)/2 is the half-wave rectification operator, <i>X</i>(<i>t</i>, <i>k</i>) is the complex short-time Fourier transform magnitude at frame <i>t</i> and frequency bin <i>k</i>, and <i>K</i> denotes the total frequency bins. Prominent peaks in <i>SF</i>(<i>t</i>) exceeding an adaptive threshold define candidate code-switch transition timestamps {<i>t</i><sub>cs</sub>}.",
         body_style
     ))
 
     story.append(Paragraph(
-        "<b>B. Boundary Prosodic and Phase Seam Extraction:</b> For each detected transition point t_cs, a symmetric window W = [t_cs - Δ, t_cs + Δ] (Δ = 250 ms) is partitioned into pre-switch (W_pre) and post-switch (W_post) segments. Across this boundary, we extract a 16-dimensional acoustic seam vector (Table 2).",
+        "<b>B. Boundary Prosodic and Phase Seam Extraction:</b> For each detected transition point <i>t</i><sub>cs</sub>, a symmetric analysis window <i>W</i> is established around the boundary:",
+        body_style
+    ))
+    story.append(Spacer(1, 2))
+    story.append(format_display_equation(
+        "<i>W</i> = [<i>t</i><sub>cs</sub> − Δ, <i>t</i><sub>cs</sub> + Δ], &nbsp;&nbsp;&nbsp;&nbsp; where &nbsp; Δ = 250 ms",
+        "(2)"
+    ))
+    story.append(Spacer(1, 2))
+    story.append(Paragraph(
+        "The window is partitioned into pre-switch (<i>W</i><sub>pre</sub> = [<i>t</i><sub>cs</sub> − Δ, <i>t</i><sub>cs</sub>]) and post-switch (<i>W</i><sub>post</sub> = [<i>t</i><sub>cs</sub>, <i>t</i><sub>cs</sub> + Δ]) segments. Across this boundary, we extract a 16-dimensional acoustic seam vector capturing fundamental frequency perturbation, energy discontinuity, spectral tilt shift, and non-linear phase desynchronization (Table 2).",
         body_style
     ))
 
     t2_data_pdf = [
         [Paragraph("<b>Index</b>", table_hdr_style), Paragraph("<b>Acoustic Metric Name</b>", table_hdr_style), Paragraph("<b>Mathematical Formulation</b>", table_hdr_style), Paragraph("<b>Physical Anomaly Targeted</b>", table_hdr_style)],
-        [Paragraph("0–1", table_cell_style), Paragraph("ΔF0 (Absolute & Relative Jump)", table_cell_left), Paragraph("|F0_post - F0_pre|, ΔF0/F0_pre", table_cell_left), Paragraph("Pitch contour discontinuity across vocoder frames", table_cell_left)],
-        [Paragraph("2–3", table_cell_style), Paragraph("ΔEnergy (RMS Step & Log Ratio)", table_cell_left), Paragraph("|E_post - E_pre|, 10 log10(E_post/E_pre)", table_cell_left), Paragraph("Sudden volume / amplitude step artifact", table_cell_left)],
-        [Paragraph("4–5", table_cell_style), Paragraph("ΔSpectral Flux Step", table_cell_left), Paragraph("SF(t_post) - SF(t_pre)", table_cell_left), Paragraph("Spectral envelope tilt dislocation", table_cell_left)],
-        [Paragraph("6–7", table_cell_style), Paragraph("Formant Phase Reset Δϕ", table_cell_left), Paragraph("arg(X_post(F1)) - arg(X_pre(F1))", table_cell_left), Paragraph("Non-linear phase desynchronization at stitch boundary", table_cell_left)],
-        [Paragraph("8–9", table_cell_style), Paragraph("Spectral Centroid Shift", table_cell_left), Paragraph("SC_post - SC_pre", table_cell_left), Paragraph("Timbral brightness jump", table_cell_left)],
-        [Paragraph("10–11", table_cell_style), Paragraph("Bandwidth Deviation", table_cell_left), Paragraph("BW_post - BW_pre", table_cell_left), Paragraph("Formant bandwidth broadening", table_cell_left)],
-        [Paragraph("12–15", table_cell_style), Paragraph("Summary Statistics", table_cell_left), Paragraph("Pooled segment mean, max, std", table_cell_left), Paragraph("Multi-boundary utterance-level cohesion", table_cell_left)],
+        [Paragraph("0–1", table_cell_style), Paragraph("Δ<i>F</i><sub>0</sub> (Absolute & Relative Jump)", table_cell_left), Paragraph("|<i>F</i><sub>0,post</sub> − <i>F</i><sub>0,pre</sub>|, &nbsp; Δ<i>F</i><sub>0</sub> / <i>F</i><sub>0,pre</sub>", table_cell_left), Paragraph("Pitch contour discontinuity across vocoder frames", table_cell_left)],
+        [Paragraph("2–3", table_cell_style), Paragraph("Δ<i>E</i> (RMS Step & Log Ratio)", table_cell_left), Paragraph("|<i>E</i><sub>post</sub> − <i>E</i><sub>pre</sub>|, &nbsp; 10 log<sub>10</sub>(<i>E</i><sub>post</sub> / <i>E</i><sub>pre</sub>)", table_cell_left), Paragraph("Sudden volume / amplitude step artifact", table_cell_left)],
+        [Paragraph("4–5", table_cell_style), Paragraph("ΔSpectral Flux Step", table_cell_left), Paragraph("<i>SF</i>(<i>t</i><sub>post</sub>) − <i>SF</i>(<i>t</i><sub>pre</sub>)", table_cell_left), Paragraph("Spectral envelope tilt dislocation", table_cell_left)],
+        [Paragraph("6–7", table_cell_style), Paragraph("Formant Phase Reset Δ<i>ϕ</i>", table_cell_left), Paragraph("arg(<i>X</i><sub>post</sub>(<i>F</i><sub>1</sub>)) − arg(<i>X</i><sub>pre</sub>(<i>F</i><sub>1</sub>))", table_cell_left), Paragraph("Non-linear phase desynchronization at stitch boundary", table_cell_left)],
+        [Paragraph("8–9", table_cell_style), Paragraph("Spectral Centroid Shift Δ<i>SC</i>", table_cell_left), Paragraph("<i>SC</i><sub>post</sub> − <i>SC</i><sub>pre</sub>", table_cell_left), Paragraph("Timbral brightness jump across language seam", table_cell_left)],
+        [Paragraph("10–11", table_cell_style), Paragraph("Bandwidth Deviation Δ<i>BW</i>", table_cell_left), Paragraph("<i>BW</i><sub>post</sub> − <i>BW</i><sub>pre</sub>", table_cell_left), Paragraph("Formant bandwidth broadening artifact", table_cell_left)],
+        [Paragraph("12–15", table_cell_style), Paragraph("Summary Statistics", table_cell_left), Paragraph("Pooled segment mean, max, std (<i>μ</i>, max, <i>σ</i>)", table_cell_left), Paragraph("Multi-boundary utterance-level cohesion", table_cell_left)],
     ]
-    t2_table = Table(t2_data_pdf, colWidths=[0.7*inch, 1.8*inch, 1.9*inch, 2.1*inch])
+    t2_table = Table(t2_data_pdf, colWidths=[0.7*inch, 1.8*inch, 2.0*inch, 2.0*inch])
     t2_table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E293B")),
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
@@ -571,14 +657,32 @@ def build_pdf():
         story.append(Paragraph("Figure 2: Empirical Acoustic Boundary Artifacts in Code-Switched Speech.", caption_style))
 
     story.append(Paragraph(
-        "<b>C. Dual-Mode Monolingual Routing:</b> When an utterance contains zero code-switching points (N_cs = 0), VaaniShield automatically switches to global macro-acoustic metrics: (1) Harmonics-to-Noise Ratio (HNR) mean and std; (2) Spectral Flatness Measure (SFM); (3) Macro Energy Variance; and (4) Zero-Crossing Rate (ZCR) Variance, providing active discriminative signal on unmixed calls.",
+        "<b>C. Dual-Mode Monolingual Routing:</b> When an utterance contains zero code-switching points (<i>N</i><sub>cs</sub> = 0), naive boundary detectors collapse into an uninformative zero vector. VaaniShield automatically activates a Dual-Mode Stream Router that switches dynamically to global macro-acoustic metrics: (1) Harmonics-to-Noise Ratio (HNR) mean and standard deviation; (2) Spectral Flatness Measure (SFM); (3) Macro Energy Variance; and (4) Zero-Crossing Rate (ZCR) Variance, providing active discriminative signal on unmixed calls.",
         body_style
     ))
 
     story.append(Paragraph(
-        "<b>D. Adaptive Regularized Subspace Projection (ARS-SNAP):</b> To prevent speaker identity biometrics from biasing deepfake classification, we project the self-supervised embedding z into a speaker-nulled subspace via Tikhonov soft-shrinkage:<br/>"
-        "&nbsp;&nbsp;&nbsp;&nbsp;<i>P_ARS = I - Φ (Φ^T Φ + λ I)⁻¹ Φ^T</i><br/>"
-        "where λ = 0.05 is the regularization shrinkage parameter. ARS-SNAP attenuates dominant speaker eigenvalues while preserving subtle vocoder synthesis artifacts.",
+        "<b>D. Adaptive Regularized Subspace Projection (ARS-SNAP):</b> To prevent speaker identity biometrics from biasing deepfake classification, we project the self-supervised embedding <b>z</b> ∈ ℝ<sup><i>D</i></sup> (<i>D</i> = 1024) into a speaker-nulled subspace. Standard SNAP applies hard orthogonal projection:",
+        body_style
+    ))
+    story.append(Spacer(1, 2))
+    story.append(format_display_equation(
+        "<b>P</b><sub>hard</sub> = <b>I</b> − <b>Φ</b>(<b>Φ</b><sup>T</sup> <b>Φ</b>)<sup>−1</sup> <b>Φ</b><sup>T</sup>",
+        "(3)"
+    ))
+    story.append(Spacer(1, 2))
+    story.append(Paragraph(
+        "where <b>Φ</b> is the basis matrix formed from the top-<i>k</i> speaker subspace eigenvectors. When evaluated on unseen out-of-domain commercial synthesizers, hard projection causes matrix near-singularity and strips critical discriminative cues. VaaniShield introduces Adaptive Regularized Subspace Projection (ARS-SNAP):",
+        body_style
+    ))
+    story.append(Spacer(1, 2))
+    story.append(format_display_equation(
+        "<b>P</b><sub>ARS</sub> = <b>I</b> − <b>Φ</b>(<b>Φ</b><sup>T</sup> <b>Φ</b> + λ<b>I</b>)<sup>−1</sup> <b>Φ</b><sup>T</sup>",
+        "(4)"
+    ))
+    story.append(Spacer(1, 2))
+    story.append(Paragraph(
+        "where λ > 0 is a Tikhonov soft-shrinkage regularization parameter (empirically calibrated to λ = 0.05). ARS-SNAP attenuates dominant speaker eigenvalues while preserving subtle vocoder synthesis artifacts.",
         body_style
     ))
 
@@ -625,10 +729,10 @@ def build_pdf():
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#1E293B"), spaceBefore=2, spaceAfter=8))
     
     story.append(Paragraph("4.1 Implementation Pipeline and Security Architecture", h2_style))
-    story.append(Paragraph("• <b>GIL-Free Vectorized YIN Pitch Tracker:</b> Replaced Praat Parselmouth C-extensions with a pure NumPy vectorized YIN algorithm utilizing O(N log N) FFT autocorrelation and parabolic peak interpolation. This eliminates Python Global Interpreter Lock (GIL) contention, enabling multi-threaded scaling on telephony servers.", bullet_style))
+    story.append(Paragraph("• <b>GIL-Free Vectorized YIN Pitch Tracker:</b> Replaced Praat Parselmouth C-extensions with a pure NumPy vectorized YIN algorithm utilizing <i>O</i>(<i>N</i> log <i>N</i>) FFT autocorrelation and parabolic peak interpolation. This eliminates Python Global Interpreter Lock (GIL) contention, enabling multi-threaded scaling on telephony servers.", bullet_style))
     story.append(Paragraph("• <b>Vectorized PyTorch Spectral Denoising:</b> Refactored audio window spectral subtraction from unvectorized Librosa loops into batched PyTorch STFT/iSTFT operations, achieving a 38x speedup (0.88 ms vs 33.6 ms per boundary window).", bullet_style))
     story.append(Paragraph("• <b>Zero-Pickle ONNX Security:</b> Eliminated Python pickle deserialization risks by exporting model weights into a pure NumPy container (model_parameters.npz) and an end-to-end ONNX inference graph (vaanishield_end_to_end.onnx) validated via mandatory SHA-256 cryptographic digests.", bullet_style))
-    story.append(Paragraph("• <b>Neyman-Pearson Banking Calibration:</b> Configured asymmetric decision boundaries tailored for financial fraud operations: Scores < 0.38 are tagged ALLOW_VERIFIED (FAR ≤ 0.1%, zero friction); 0.38 ≤ Score < 0.58 trigger STEP_UP_AUTH (out-of-band verification); and Scores ≥ 0.58 trigger BLOCK_AND_ALERT.", bullet_style))
+    story.append(Paragraph("• <b>Neyman-Pearson Banking Calibration:</b> Configured asymmetric decision boundaries tailored for financial fraud operations: Scores <i>s</i> < <i>τ</i><sub>review</sub> (0.38) are tagged ALLOW_VERIFIED (FAR ≤ 0.1%, zero friction); <i>τ</i><sub>review</sub> ≤ <i>s</i> < <i>τ</i><sub>block</sub> (0.58) trigger STEP_UP_AUTH (out-of-band biometric challenge); and Scores <i>s</i> ≥ <i>τ</i><sub>block</sub> (0.58) trigger BLOCK_AND_ALERT.", bullet_style))
 
     story.append(Paragraph("4.2 Empirical Results and Discussion Across Benchmark Regimes", h2_style))
     story.append(Paragraph(
@@ -637,18 +741,18 @@ def build_pdf():
     ))
 
     t4_data_pdf = [
-        [Paragraph("<b>Regime</b>", table_hdr_style), Paragraph("<b>N</b>", table_hdr_style), Paragraph("<b>Hard SNAP EER</b>", table_hdr_style), Paragraph("<b>ARS-SNAP EER</b>", table_hdr_style), Paragraph("<b>Rel. Drop</b>", table_hdr_style), Paragraph("<b>AUC</b>", table_hdr_style), Paragraph("<b>95% Wilson CI</b>", table_hdr_style)],
+        [Paragraph("<b>Regime</b>", table_hdr_style), Paragraph("<b><i>N</i></b>", table_hdr_style), Paragraph("<b>Hard SNAP EER<br/>(λ = 0.0)</b>", table_hdr_style), Paragraph("<b>ARS-SNAP EER<br/>(λ = 0.05)</b>", table_hdr_style), Paragraph("<b>Rel. Δ (%)</b>", table_hdr_style), Paragraph("<b>AUC</b>", table_hdr_style), Paragraph("<b>95% Wilson CI</b>", table_hdr_style)],
         [Paragraph("Overall Corpus", table_cell_left), Paragraph("1,600", table_cell_style), Paragraph("23.12%", table_cell_style), Paragraph("23.12%", table_cell_style), Paragraph("+0.0%", table_cell_style), Paragraph("0.838", table_cell_style), Paragraph("[0.211, 0.252] (±2.1%)", table_cell_style)],
-        [Paragraph("In-Domain Test", table_cell_left), Paragraph("350", table_cell_style), Paragraph("30.57%", table_cell_style), Paragraph("31.43%", table_cell_style), Paragraph("-2.8%", table_cell_style), Paragraph("0.742", table_cell_style), Paragraph("[0.268, 0.365] (±4.8%)", table_cell_style)],
+        [Paragraph("In-Domain Test", table_cell_left), Paragraph("350", table_cell_style), Paragraph("30.57%", table_cell_style), Paragraph("31.43%", table_cell_style), Paragraph("−2.8%", table_cell_style), Paragraph("0.742", table_cell_style), Paragraph("[0.268, 0.365] (±4.8%)", table_cell_style)],
         [Paragraph("Cross-Dialect (Telugu)", table_cell_left), Paragraph("400", table_cell_style), Paragraph("11.50%", table_cell_style), Paragraph("<b>11.00%</b>", table_cell_style), Paragraph("<b>+4.3%</b>", table_cell_style), Paragraph("<b>0.942</b>", table_cell_style), Paragraph("[0.083, 0.145] (±3.1%)", table_cell_style)],
         [Paragraph("Out-of-Domain Edge TTS", table_cell_left), Paragraph("470", table_cell_style), Paragraph("21.87%", table_cell_style), Paragraph("<b>20.62%</b>", table_cell_style), Paragraph("<b>+5.7%</b>", table_cell_style), Paragraph("<b>0.865</b>", table_cell_style), Paragraph("[0.172, 0.245] (±3.6%)", table_cell_style)],
-        [Paragraph("Telephony Codecs", table_cell_left), Paragraph("640", table_cell_style), Paragraph("21.25%", table_cell_style), Paragraph("21.72%", table_cell_style), Paragraph("-2.2%", table_cell_style), Paragraph("0.849", table_cell_style), Paragraph("[0.187, 0.251] (±3.2%)", table_cell_style)],
-        [Paragraph("Packet Loss Simulation", table_cell_left), Paragraph("320", table_cell_style), Paragraph("18.75%", table_cell_style), Paragraph("20.94%", table_cell_style), Paragraph("-11.7%", table_cell_style), Paragraph("0.858", table_cell_style), Paragraph("[0.168, 0.257] (±4.4%)", table_cell_style)],
-        [Paragraph("Ambient Noise Injection", table_cell_left), Paragraph("320", table_cell_style), Paragraph("30.31%", table_cell_style), Paragraph("30.63%", table_cell_style), Paragraph("-1.1%", table_cell_style), Paragraph("0.751", table_cell_style), Paragraph("[0.258, 0.359] (±5.0%)", table_cell_style)],
+        [Paragraph("Telephony Codecs", table_cell_left), Paragraph("640", table_cell_style), Paragraph("21.25%", table_cell_style), Paragraph("21.72%", table_cell_style), Paragraph("−2.2%", table_cell_style), Paragraph("0.849", table_cell_style), Paragraph("[0.187, 0.251] (±3.2%)", table_cell_style)],
+        [Paragraph("Packet Loss Simulation", table_cell_left), Paragraph("320", table_cell_style), Paragraph("18.75%", table_cell_style), Paragraph("20.94%", table_cell_style), Paragraph("−11.7%", table_cell_style), Paragraph("0.858", table_cell_style), Paragraph("[0.168, 0.257] (±4.4%)", table_cell_style)],
+        [Paragraph("Ambient Noise Injection", table_cell_left), Paragraph("320", table_cell_style), Paragraph("30.31%", table_cell_style), Paragraph("30.63%", table_cell_style), Paragraph("−1.1%", table_cell_style), Paragraph("0.751", table_cell_style), Paragraph("[0.258, 0.359] (±5.0%)", table_cell_style)],
         [Paragraph("Female Callers", table_cell_left), Paragraph("800", table_cell_style), Paragraph("23.63%", table_cell_style), Paragraph("<b>23.00%</b>", table_cell_style), Paragraph("+2.7%", table_cell_style), Paragraph("0.839", table_cell_style), Paragraph("[0.202, 0.260] (±2.9%)", table_cell_style)],
-        [Paragraph("Male Callers", table_cell_left), Paragraph("800", table_cell_style), Paragraph("23.75%", table_cell_style), Paragraph("<b>23.88%</b>", table_cell_style), Paragraph("-0.5%", table_cell_style), Paragraph("0.837", table_cell_style), Paragraph("[0.210, 0.270] (±2.9%)", table_cell_style)],
+        [Paragraph("Male Callers", table_cell_left), Paragraph("800", table_cell_style), Paragraph("23.75%", table_cell_style), Paragraph("<b>23.88%</b>", table_cell_style), Paragraph("−0.5%", table_cell_style), Paragraph("0.837", table_cell_style), Paragraph("[0.210, 0.270] (±2.9%)", table_cell_style)],
     ]
-    t4_table = Table(t4_data_pdf, colWidths=[1.4*inch, 0.5*inch, 0.9*inch, 0.9*inch, 0.7*inch, 0.6*inch, 1.5*inch])
+    t4_table = Table(t4_data_pdf, colWidths=[1.4*inch, 0.5*inch, 0.95*inch, 0.95*inch, 0.65*inch, 0.55*inch, 1.5*inch])
     t4_table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E293B")),
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
