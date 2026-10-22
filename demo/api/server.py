@@ -123,7 +123,7 @@ SAMPLE_CATALOG = [
     {
         "id": "sample_cloned",
         "name": "Cloned Voice — Hindi-English (Coqui XTTS v2 spk_1119)",
-        "path": "data/processed/train_clones/spk_1119_utt_000_xtts.wav",
+        "path": "data/processed/train_clones/spk_1119_utt_004_xtts.wav",
         "transcript": "Mera laptop start nahi ho raha, can you check the battery?",
         "expected": "spoof",
         "language_pair": "hi-en",
@@ -131,15 +131,15 @@ SAMPLE_CATALOG = [
     {
         "id": "sample_codec",
         "name": "Cloned Voice — 8 kHz Telephony Codec (G.711 μ-law)",
-        "path": "data/processed/augmented/spk_1119_utt_000_xtts_codec.wav",
+        "path": "data/processed/augmented/spk_2131_utt_009_xtts_heldout_codec.wav",
         "transcript": "Mera laptop start nahi ho raha, can you check the battery?",
         "expected": "spoof",
         "language_pair": "hi-en",
     },
     {
         "id": "sample_kannada_bonafide",
-        "name": "[UNSEEN TEST SPLIT] Authentic Human — Kannada-English (OpenSLR 79 spk_kn_02)",
-        "path": "data/raw/spk_kn_02_knm_00271_00003824418.wav",
+        "name": "[UNSEEN TEST SPLIT] Authentic Human — Kannada-English (OpenSLR 79 spk_kn_04)",
+        "path": "data/raw/spk_kn_f04_clean_002.wav",
         "transcript": "Nimma bank account block agide, verify your account details immediately.",
         "expected": "bonafide",
         "language_pair": "kn-en",
@@ -155,7 +155,7 @@ SAMPLE_CATALOG = [
     {
         "id": "sample_heldout_cloned",
         "name": "[UNSEEN HELDOUT SPLIT] Cloned Voice — Unseen Held-Out Speaker (spk_5945)",
-        "path": "data/processed/train_clones/spk_5945_utt_015_xtts.wav",
+        "path": "data/processed/train_clones/spk_5945_utt_018_xtts.wav",
         "transcript": "Mera account freeze ho gaya hai, please verify the transaction now.",
         "expected": "spoof",
         "language_pair": "hi-en",

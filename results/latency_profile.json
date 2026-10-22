@@ -4,75 +4,75 @@
   "total_evaluations": 75,
   "summary": {
     "audio_io_disk_ms": {
-      "median_ms": 1.419,
-      "mean_ms": 1.721,
-      "p95_ms": 3.325,
-      "p99_ms": 5.544,
-      "min_ms": 0.744,
-      "max_ms": 8.011
+      "median_ms": 1.248,
+      "mean_ms": 1.443,
+      "p95_ms": 3.079,
+      "p99_ms": 4.449,
+      "min_ms": 0.789,
+      "max_ms": 4.71
     },
     "changepoint_localization_ms": {
-      "median_ms": 6.417,
-      "mean_ms": 8.921,
-      "p95_ms": 19.403,
-      "p99_ms": 49.343,
-      "min_ms": 2.962,
-      "max_ms": 80.823
+      "median_ms": 5.767,
+      "mean_ms": 7.036,
+      "p95_ms": 11.503,
+      "p99_ms": 27.6,
+      "min_ms": 3.287,
+      "max_ms": 40.147
     },
     "boundary_feature_extraction_ms": {
-      "median_ms": 105.883,
-      "mean_ms": 120.19,
-      "p95_ms": 223.968,
-      "p99_ms": 340.272,
-      "min_ms": 65.504,
-      "max_ms": 585.315
+      "median_ms": 92.495,
+      "mean_ms": 118.687,
+      "p95_ms": 239.216,
+      "p99_ms": 409.205,
+      "min_ms": 64.844,
+      "max_ms": 537.938
     },
     "snap_embedding_ms": {
-      "median_ms": 21.356,
-      "mean_ms": 28.587,
-      "p95_ms": 67.89,
-      "p99_ms": 159.217,
-      "min_ms": 8.583,
-      "max_ms": 296.654
+      "median_ms": 19.71,
+      "mean_ms": 25.044,
+      "p95_ms": 50.611,
+      "p99_ms": 104.976,
+      "min_ms": 10.881,
+      "max_ms": 162.634
     },
     "snap_projection_ms": {
-      "median_ms": 0.059,
+      "median_ms": 0.057,
       "mean_ms": 0.077,
-      "p95_ms": 0.098,
-      "p99_ms": 0.406,
+      "p95_ms": 0.158,
+      "p99_ms": 0.563,
       "min_ms": 0.044,
-      "max_ms": 1.16
+      "max_ms": 0.58
     },
     "onnx_inference_e2e_ms": {
-      "median_ms": 0.162,
-      "mean_ms": 0.188,
-      "p95_ms": 0.315,
-      "p99_ms": 0.763,
-      "min_ms": 0.101,
-      "max_ms": 1.394
+      "median_ms": 0.155,
+      "mean_ms": 0.219,
+      "p95_ms": 0.388,
+      "p99_ms": 1.328,
+      "min_ms": 0.097,
+      "max_ms": 3.503
     },
     "zeropickle_inference_ms": {
       "median_ms": 0.095,
-      "mean_ms": 0.166,
-      "p95_ms": 0.402,
-      "p99_ms": 1.825,
-      "min_ms": 0.072,
-      "max_ms": 2.575
+      "mean_ms": 0.102,
+      "p95_ms": 0.152,
+      "p99_ms": 0.294,
+      "min_ms": 0.065,
+      "max_ms": 0.342
     },
     "full_pipeline_optimized_ms": {
-      "median_ms": 127.305,
-      "mean_ms": 169.228,
-      "p95_ms": 281.211,
-      "p99_ms": 1063.445,
-      "min_ms": 88.752,
-      "max_ms": 1259.925
+      "median_ms": 125.326,
+      "mean_ms": 147.496,
+      "p95_ms": 243.262,
+      "p99_ms": 413.87,
+      "min_ms": 82.701,
+      "max_ms": 543.772
     }
   },
   "key_findings": {
-    "onnx_inference_latency_ms": 0.162,
-    "full_pipeline_latency_median_ms": 127.305,
-    "full_pipeline_latency_p95_ms": 281.211,
-    "full_pipeline_latency_p99_ms": 1063.445,
+    "onnx_inference_latency_ms": 0.155,
+    "full_pipeline_latency_median_ms": 125.326,
+    "full_pipeline_latency_p95_ms": 243.262,
+    "full_pipeline_latency_p99_ms": 413.87,
     "telephony_streaming_budget_ms": 200.0,
     "meets_telephony_realtime_budget": false
   }
