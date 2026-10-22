@@ -169,34 +169,78 @@ print("Saved Figure 3.")
 # -------------------------------------------------------------
 # Figure 4: Neyman-Pearson 3-Tier Operating Calibration
 # -------------------------------------------------------------
-fig, ax = plt.subplots(figsize=(9, 4), dpi=300)
+fig, ax = plt.subplots(figsize=(10, 4.8), dpi=300)
 
-scores = np.linspace(0, 1, 500)
+scores = np.linspace(0, 1, 600)
 # Mock distribution of genuine vs spoof scores
-bona_density = np.exp(-((scores - 0.22)**2) / 0.015)
-spoof_density = np.exp(-((scores - 0.72)**2) / 0.025)
+bona_density = np.exp(-((scores - 0.20)**2) / 0.016)
+spoof_density = np.exp(-((scores - 0.75)**2) / 0.024)
 
-ax.plot(scores, bona_density, label="Bona-fide Caller Distribution", color="#059669", lw=2.2)
-ax.plot(scores, spoof_density, label="Spoofed / Cloned Voice Distribution", color="#DC2626", lw=2.2)
+# Operational Tiers Shading with subtle borders
+ax.axvspan(0.00, 0.38, alpha=0.18, color="#10B981", zorder=1)
+ax.axvspan(0.38, 0.58, alpha=0.18, color="#F59E0B", zorder=1)
+ax.axvspan(0.58, 1.00, alpha=0.18, color="#EF4444", zorder=1)
 
-# Operational Tiers
-ax.axvspan(0.00, 0.38, alpha=0.15, color="#10B981", label="ALLOW_VERIFIED (FAR ≤ 0.1%, Friction 0%)")
-ax.axvspan(0.38, 0.58, alpha=0.20, color="#F59E0B", label="STEP_UP_AUTH (Indeterminate / Review)")
-ax.axvspan(0.58, 1.00, alpha=0.15, color="#EF4444", label="BLOCK_AND_ALERT (Confirmed Deepfake Fraud)")
+# Filled density curves for premium aesthetics
+ax.fill_between(scores, bona_density, color="#059669", alpha=0.25, zorder=2)
+ax.fill_between(scores, spoof_density, color="#DC2626", alpha=0.25, zorder=2)
 
-ax.axvline(0.38, color="#D97706", linestyle="--", lw=1.8, label="tau_review = 0.38")
-ax.axvline(0.58, color="#B91C1C", linestyle="--", lw=1.8, label="tau_block = 0.58")
+# Solid smooth lines
+line1, = ax.plot(scores, bona_density, label="Bona-fide Caller (Genuine)", color="#047857", lw=2.8, zorder=3)
+line2, = ax.plot(scores, spoof_density, label="Synthesized Voice (Spoof)", color="#B91C1C", lw=2.8, zorder=3)
 
-ax.set_xlabel("Calibrated Fraud Risk Probability P(Spoof | x)")
-ax.set_ylabel("Empirical Probability Density")
-ax.set_title("Figure 4: Asymmetric Neyman-Pearson 3-Tier Decision Routing for Banking Call Centers", weight="bold")
-ax.legend(loc="upper center", frameon=True, ncol=2)
-ax.grid(True, alpha=0.3)
+# Threshold vertical lines
+line_tau1 = ax.axvline(0.38, color="#D97706", linestyle="--", lw=2.0, zorder=4)
+line_tau2 = ax.axvline(0.58, color="#991B1B", linestyle="--", lw=2.0, zorder=4)
+
+# Threshold labels directly on the plot
+ax.text(0.38, 1.15, "τ_review = 0.38", color="#B45309", weight="bold", fontsize=9, ha="center", va="bottom",
+        bbox=dict(boxstyle="round,pad=0.25", fc="#FEF3C7", ec="#F59E0B", lw=1))
+ax.text(0.58, 1.15, "τ_block = 0.58", color="#991B1B", weight="bold", fontsize=9, ha="center", va="bottom",
+        bbox=dict(boxstyle="round,pad=0.25", fc="#FEE2E2", ec="#EF4444", lw=1))
+
+# Tier Region Header Annotations
+ax.text(0.19, 1.05, "TIER 1: ALLOW_VERIFIED\n(FAR ≤ 0.1% | Seamless Friction)",
+        ha="center", va="center", color="#065F46", weight="bold", fontsize=8.5,
+        bbox=dict(boxstyle="round,pad=0.4", fc="#D1FAE5", ec="#10B981", lw=1.2, alpha=0.9))
+
+ax.text(0.48, 1.05, "TIER 2: STEP_UP_AUTH\n(Indeterminate | SMS/OTP)",
+        ha="center", va="center", color="#92400E", weight="bold", fontsize=8.5,
+        bbox=dict(boxstyle="round,pad=0.4", fc="#FEF3C7", ec="#F59E0B", lw=1.2, alpha=0.9))
+
+ax.text(0.79, 1.05, "TIER 3: BLOCK_AND_ALERT\n(Confirmed Fraud | Call Severed)",
+        ha="center", va="center", color="#991B1B", weight="bold", fontsize=8.5,
+        bbox=dict(boxstyle="round,pad=0.4", fc="#FEE2E2", ec="#EF4444", lw=1.2, alpha=0.9))
+
+# Styling & Limits
+ax.set_xlim(0.0, 1.0)
+ax.set_ylim(-0.04, 1.28)
+ax.set_xlabel("Calibrated Fraud Risk Probability  P(Spoof | x)", fontsize=10.5, labelpad=8, weight="medium")
+ax.set_ylabel("Empirical Probability Density", fontsize=10.5, labelpad=8, weight="medium")
+
+# Single clean legend at bottom center
+legend = ax.legend(
+    [line1, line2],
+    ["Bona-fide Caller Distribution (Human)", "Spoofed Voice Distribution (Cloned)"],
+    loc="upper left",
+    bbox_to_anchor=(0.02, 0.88),
+    frameon=True,
+    facecolor="white",
+    edgecolor="#CBD5E1",
+    fontsize=9
+)
+legend.get_frame().set_linewidth(0.8)
+
+ax.grid(True, linestyle=":", alpha=0.45, color="#94A3B8")
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+ax.spines["left"].set_color("#475569")
+ax.spines["bottom"].set_color("#475569")
 
 plt.tight_layout()
 fig.savefig(out_dir / "fig4_neyman_pearson_tiers.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
-print("Saved Figure 4.")
+print("Saved redesigned Figure 4.")
 
 # -------------------------------------------------------------
 # Figure 5: Pipeline Latency Breakdown
