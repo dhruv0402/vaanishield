@@ -67,8 +67,10 @@ def add_body_paragraph(doc, text, bold_prefix="", space_after=6, italic=False):
     r.font.color.rgb = RGBColor(30, 41, 59)
     return p
 
-def add_equation_paragraph(doc, eq_text, eq_number):
-    """Adds a formal publication-style equation table with centered equation and right-aligned number."""
+def add_equation_paragraph(doc, eq_content, eq_number):
+    """Adds a formal publication-style equation table with centered equation and right-aligned number.
+    eq_content can be a string or a list of tuples: (text, is_italic, is_bold, is_subscript, is_superscript)
+    """
     table = doc.add_table(rows=1, cols=2)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.autofit = False
@@ -91,10 +93,28 @@ def add_equation_paragraph(doc, eq_text, eq_number):
     p0.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p0.paragraph_format.space_before = Pt(3)
     p0.paragraph_format.space_after = Pt(3)
-    r0 = p0.add_run(eq_text)
-    r0.font.name = "Times New Roman"
-    r0.font.size = Pt(11.5)
-    r0.font.color.rgb = RGBColor(15, 23, 42)
+    
+    if isinstance(eq_content, list):
+        for item in eq_content:
+            text = item[0]
+            italic = item[1] if len(item) > 1 else False
+            bold = item[2] if len(item) > 2 else False
+            sub = item[3] if len(item) > 3 else False
+            sup = item[4] if len(item) > 4 else False
+            
+            r = p0.add_run(text)
+            r.font.name = "Times New Roman"
+            r.font.size = Pt(11.5)
+            r.font.italic = italic
+            r.font.bold = bold
+            r.font.subscript = sub
+            r.font.superscript = sup
+            r.font.color.rgb = RGBColor(15, 23, 42)
+    else:
+        r0 = p0.add_run(str(eq_content))
+        r0.font.name = "Times New Roman"
+        r0.font.size = Pt(11.5)
+        r0.font.color.rgb = RGBColor(15, 23, 42)
     
     # Equation number paragraph
     p1 = table.rows[0].cells[1].paragraphs[0]
@@ -533,7 +553,29 @@ def build_report():
     )
     add_equation_paragraph(
         doc,
-        "SF(t) = ∑_{k=1}^K H(|X(t, k)| − |X(t−1, k)|)²",
+        [
+            ("SF", True, False, False, False),
+            ("(", False, False, False, False),
+            ("t", True, False, False, False),
+            (") = ∑", False, False, False, False),
+            ("k=1", True, False, True, False),
+            ("K", True, False, False, True),
+            (" H", False, False, False, False),
+            ("(|", False, False, False, False),
+            ("X", True, False, False, False),
+            ("(", False, False, False, False),
+            ("t", True, False, False, False),
+            (", ", False, False, False, False),
+            ("k", True, False, False, False),
+            (")| − |", False, False, False, False),
+            ("X", True, False, False, False),
+            ("(", False, False, False, False),
+            ("t", True, False, False, False),
+            ("−1, ", False, False, False, False),
+            ("k", True, False, False, False),
+            ("|)", False, False, False, False),
+            ("2", False, False, False, True),
+        ],
         "(1)"
     )
     add_body_paragraph(
@@ -548,7 +590,16 @@ def build_report():
     )
     add_equation_paragraph(
         doc,
-        "W = [t_cs − Δ, t_cs + Δ],      where   Δ = 250 ms",
+        [
+            ("W", True, False, False, False),
+            (" = [", False, False, False, False),
+            ("t", True, False, False, False),
+            ("cs", False, False, True, False),
+            (" − Δ, ", False, False, False, False),
+            ("t", True, False, False, False),
+            ("cs", False, False, True, False),
+            (" + Δ],      where   Δ = 250 ms", False, False, False, False),
+        ],
         "(2)"
     )
     add_body_paragraph(
@@ -592,7 +643,24 @@ def build_report():
     )
     add_equation_paragraph(
         doc,
-        "P_hard = I − Φ (Φᵀ Φ)⁻¹ Φᵀ",
+        [
+            ("P", False, True, False, False),
+            ("hard", False, False, True, False),
+            (" = ", False, False, False, False),
+            ("I", False, True, False, False),
+            (" − ", False, False, False, False),
+            ("Φ", False, True, False, False),
+            (" (", False, False, False, False),
+            ("Φ", False, True, False, False),
+            ("T", False, False, False, True),
+            (" ", False, False, False, False),
+            ("Φ", False, True, False, False),
+            (")", False, False, False, False),
+            ("−1", False, False, False, True),
+            (" ", False, False, False, False),
+            ("Φ", False, True, False, False),
+            ("T", False, False, False, True),
+        ],
         "(3)"
     )
     add_body_paragraph(
@@ -602,7 +670,26 @@ def build_report():
     )
     add_equation_paragraph(
         doc,
-        "P_ARS = I − Φ (Φᵀ Φ + λ I)⁻¹ Φᵀ",
+        [
+            ("P", False, True, False, False),
+            ("ARS", False, False, True, False),
+            (" = ", False, False, False, False),
+            ("I", False, True, False, False),
+            (" − ", False, False, False, False),
+            ("Φ", False, True, False, False),
+            (" (", False, False, False, False),
+            ("Φ", False, True, False, False),
+            ("T", False, False, False, True),
+            (" ", False, False, False, False),
+            ("Φ", False, True, False, False),
+            (" + λ ", False, False, False, False),
+            ("I", False, True, False, False),
+            (")", False, False, False, False),
+            ("−1", False, False, False, True),
+            (" ", False, False, False, False),
+            ("Φ", False, True, False, False),
+            ("T", False, False, False, True),
+        ],
         "(4)"
     )
     add_body_paragraph(
