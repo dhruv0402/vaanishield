@@ -55,21 +55,30 @@ def draw_node(x, y, w, h, title, details, header_bg="#1E293B", text_color="#0F17
     ax.text(x + w/2, y + (h - 0.08)/2, details, color=text_color,
             ha="center", va="center", fontsize=7.8, linespacing=1.35, zorder=4)
 
-# Professional straight connecting arrow
+# Professional straight connecting arrow with clean label placement
 def draw_link(x1, y1, x2, y2, label=""):
     arrow = patches.FancyArrowPatch(
         (x1, y1), (x2, y2),
         arrowstyle="-|>",
         mutation_scale=11,
         color="#475569",
-        linewidth=1.2,
+        linewidth=1.3,
         zorder=5
     )
     ax.add_patch(arrow)
     if label:
-        mx, my = (x1 + x2)/2, (y1 + y2)/2
-        ax.text(mx, my + 0.025, label, fontsize=7.0, color="#475569",
-                ha="center", va="bottom", zorder=6)
+        # Place label strictly at 40% of the line distance so it never touches the arrowhead at the end
+        mx = x1 + (x2 - x1) * 0.40
+        my = y1 + (y2 - y1) * 0.40
+        # Compute slope angle for proper slight vertical offset
+        angle = np.degrees(np.arctan2(y2 - y1, x2 - x1))
+        offset_y = 0.038 if (y2 >= y1) else -0.038
+        ax.text(
+            mx, my + offset_y, label,
+            fontsize=7.2, color="#334155", weight="bold",
+            ha="center", va="center", zorder=6,
+            bbox=dict(boxstyle="round,pad=0.2", fc="#FFFFFF", ec="#CBD5E1", lw=0.6, alpha=0.95)
+        )
 
 # Column 1: Input (x=0.03, w=0.18)
 draw_node(0.03, 0.35, 0.18, 0.38, "1. Audio Ingestion",
@@ -96,17 +105,15 @@ draw_node(0.84, 0.28, 0.14, 0.50, "4. Banking Tiers",
           "ALLOW_VERIFIED\n(p < 0.25 | Seamless)\n\nSTEP_UP_AUTH\n(0.25 ≤ p < 0.70 | OTP)\n\nBLOCK_AND_ALERT\n(p ≥ 0.70 | Severed)",
           header_bg="#991B1B", border="#EF4444")
 
-# Clean, non-intersecting connector links
-# From Ingestion to Stream 1 & 2
+# Clean, non-intersecting connector links with ample space
 draw_link(0.21, 0.58, 0.28, 0.74, "Waveform")
 draw_link(0.21, 0.48, 0.28, 0.30, "Waveform")
 
-# From Streams to Fusion
 draw_link(0.50, 0.74, 0.57, 0.60, "14-D Vector")
 draw_link(0.50, 0.30, 0.57, 0.46, "128-D Vector")
 
-# From Fusion to Banking Tiers
 draw_link(0.78, 0.53, 0.84, 0.53, "P(Spoof)")
+
 
 # Clean section banner at bottom
 ax.text(0.54, 0.03, "Dual-Mode Monolingual Router: Automatically extracts global HNR and spectral flatness when language transition count N_cs = 0",
