@@ -2,7 +2,7 @@
 """
 Generate publication-quality figures for the VaaniShield Academic Project Report.
 Outputs high-resolution 300 DPI PNGs to docs/figures/ for embedding in Word and PDF reports.
-All legends and annotations are engineered with dedicated margins to prevent any visual overlap.
+All diagrams are minimalist, clean, subtle, and professionally spaced.
 """
 from pathlib import Path
 import matplotlib.pyplot as plt
@@ -14,183 +14,134 @@ out_dir.mkdir(parents=True, exist_ok=True)
 plt.style.use("seaborn-v0_8-whitegrid" if "seaborn-v0_8-whitegrid" in plt.style.available else "default")
 plt.rcParams.update({
     "font.family": "serif",
-    "font.size": 10.5,
+    "font.size": 10,
     "axes.labelsize": 11,
     "axes.titlesize": 12,
     "xtick.labelsize": 9.5,
     "ytick.labelsize": 9.5,
-    "legend.fontsize": 9.5,
+    "legend.fontsize": 9,
     "figure.titlesize": 13,
 })
 
 # -------------------------------------------------------------
-# Figure 1: Hierarchical Multi-Stream System Architecture (Publication-Grade)
+# Figure 1: Clean, Minimalist, Subtle System Architecture
 # -------------------------------------------------------------
-fig, ax = plt.subplots(figsize=(11.5, 6.2), dpi=300)
+fig, ax = plt.subplots(figsize=(10.5, 4.2), dpi=300)
 ax.axis("off")
+fig.patch.set_facecolor("#FFFFFF")
+ax.set_facecolor("#FFFFFF")
 
-# Canvas styling with subtle background
-fig.patch.set_facecolor("#FAFCFF")
-ax.set_facecolor("#FAFCFF")
-
-# Helper to draw stream region background panels
-def draw_panel(x, y, w, h, title, fill_color, border_color):
-    panel = patches.FancyBboxPatch(
-        (x, y), w, h, boxstyle="round,pad=0.015",
-        facecolor=fill_color, edgecolor=border_color, linewidth=1.2, linestyle="--", alpha=0.6, zorder=1
-    )
-    ax.add_patch(panel)
-    ax.text(x + 0.02, y + h - 0.035, title, fontsize=8.5, weight="bold", color=border_color, va="top", ha="left", zorder=2)
-
-# Helper to draw module cards
-def draw_card(x, y, w, h, title, subtitle="", badge="", header_color="#2563EB", bg_color="#FFFFFF", border_color="#CBD5E1"):
-    # Main card box
+# Clean, elegant block drawing function
+def draw_node(x, y, w, h, title, details, header_bg="#1E293B", text_color="#0F172A", border="#CBD5E1"):
+    # Main subtle box
     box = patches.FancyBboxPatch(
-        (x, y), w, h, boxstyle="round,pad=0.012",
-        facecolor=bg_color, edgecolor=border_color, linewidth=1.4, zorder=3
+        (x, y), w, h, boxstyle="round,pad=0.015",
+        facecolor="#F8FAFC", edgecolor=border, linewidth=1.2, zorder=2
     )
     ax.add_patch(box)
     
-    # Header bar accent
-    header_bar = patches.FancyBboxPatch(
-        (x, y + h - 0.055), w, 0.055, boxstyle="round,pad=0.008",
-        facecolor=header_color, edgecolor="none", zorder=4
+    # Clean header strip
+    hdr = patches.FancyBboxPatch(
+        (x, y + h - 0.08), w, 0.08, boxstyle="round,pad=0.008",
+        facecolor=header_bg, edgecolor="none", zorder=3
     )
-    ax.add_patch(header_bar)
+    ax.add_patch(hdr)
     
-    # Title text
-    ax.text(x + w/2, y + h - 0.028, title, color="white", weight="bold", ha="center", va="center", fontsize=9.2, zorder=5)
+    # Header title text
+    ax.text(x + w/2, y + h - 0.04, title, color="white", weight="bold",
+            ha="center", va="center", fontsize=8.8, zorder=4)
     
-    # Badge (if any)
-    if badge:
-        ax.text(x + w - 0.015, y + h + 0.018, badge, color="#0F172A", weight="bold", ha="right", va="bottom",
-                fontsize=7.2, bbox=dict(boxstyle="round,pad=0.2", fc="#E0F2FE", ec="#0284C7", lw=0.8), zorder=6)
-    
-    # Subtitle / content
-    if subtitle:
-        ax.text(x + w/2, y + (h - 0.055)/2, subtitle, color="#334155", ha="center", va="center", fontsize=8.0, linespacing=1.25, zorder=5)
+    # Detail bullet lines
+    ax.text(x + w/2, y + (h - 0.08)/2, details, color=text_color,
+            ha="center", va="center", fontsize=7.8, linespacing=1.35, zorder=4)
 
-# Helper to draw professional smooth connecting arrows
-def draw_conn(x1, y1, x2, y2, label="", color="#475569", style="-|>", rad=0.0, lw=1.8):
-    connectionstyle = f"arc3,rad={rad}" if rad != 0.0 else "arc3"
+# Professional straight connecting arrow
+def draw_link(x1, y1, x2, y2, label=""):
     arrow = patches.FancyArrowPatch(
         (x1, y1), (x2, y2),
-        connectionstyle=connectionstyle,
-        arrowstyle=style,
-        mutation_scale=13,
-        color=color,
-        linewidth=lw,
-        zorder=7
+        arrowstyle="-|>",
+        mutation_scale=11,
+        color="#475569",
+        linewidth=1.2,
+        zorder=5
     )
     ax.add_patch(arrow)
     if label:
         mx, my = (x1 + x2)/2, (y1 + y2)/2
-        ax.text(mx, my + 0.02, label, fontsize=7.2, color="#0F172A", weight="bold", ha="center", va="center",
-                bbox=dict(boxstyle="round,pad=0.15", fc="#FFFFFF", ec="#94A3B8", lw=0.6, alpha=0.9), zorder=8)
+        ax.text(mx, my + 0.025, label, fontsize=7.0, color="#475569",
+                ha="center", va="bottom", zorder=6)
 
-# 1. Background Domain Panels
-draw_panel(0.24, 0.54, 0.44, 0.42, "STREAM 1: BOUNDARY-LOCAL MICRO-ACOUSTIC SEAM STREAM (Prosody & Phase Dynamics)", "#F0FDF4", "#059669")
-draw_panel(0.24, 0.04, 0.44, 0.46, "STREAM 2: SEMANTIC-ACOUSTIC FOUNDATION & SPEAKER-NULLING (ARS-SNAP)", "#FAF5FF", "#7C3AED")
-draw_panel(0.72, 0.18, 0.38, 0.64, "HIERARCHICAL FUSION, ONNX ENGINE & NEYMAN-PEARSON TIERS", "#FFF7ED", "#C2410C")
+# Column 1: Input (x=0.03, w=0.18)
+draw_node(0.03, 0.35, 0.18, 0.38, "1. Audio Ingestion",
+          "Telephony Speech (16 kHz)\nNarrowband Codecs\n(G.711 μ-law / AMR-WB)\nNoise Denoising & Norm",
+          header_bg="#0F172A", border="#475569")
 
-# 2. Stage Cards
-# Input Ingestion
-draw_card(0.02, 0.38, 0.18, 0.28, "INGESTION & CODEC",
-          "Raw PCM / G.711 / AMR\n16 kHz Telephony Audio\nSpectral Denoising (38x)\nSilence Trimming & Normalization",
-          badge="TELEPHONY IN", header_color="#0F172A", bg_color="#FFFFFF", border_color="#334155")
+# Stream 1: Top Branch (x=0.28, w=0.22)
+draw_node(0.28, 0.56, 0.22, 0.36, "Stream 1: Boundary Seams",
+          "Spectral Flux Localizer (40ms)\nVectorized YIN Pitch (34ms)\nΔF0, ΔEnergy, Phase Resets\n14-D Micro-Acoustic Vector",
+          header_bg="#047857", border="#10B981")
 
-# Stream 1 Cards
-draw_card(0.26, 0.58, 0.18, 0.32, "BOUNDARY LOCALIZER",
-          "Acoustic Flux Tracking\nSliding 40ms MFCC Delta\nTemporal NMS Suppressor\nBilateral Window (±100ms)",
-          badge="ΔMFCC / Flux", header_color="#059669", border_color="#10B981")
+# Stream 2: Bottom Branch (x=0.28, w=0.22)
+draw_node(0.28, 0.12, 0.22, 0.36, "Stream 2: Speaker Nulling",
+          "SSL Foundation (WavLM/XLSR)\nEmpirical Covariance SVD\nARS-SNAP Soft-Nulling\n128-D Identity-Nulled Vector",
+          header_bg="#6D28D9", border="#8B5CF6")
 
-draw_card(0.48, 0.58, 0.18, 0.32, "ACOUSTIC SEAM ENGINE",
-          "Vectorized YIN Pitch (34ms)\nΔF0 Jumps & Glottal Velocity\nShort-time Energy Steps ΔE\nSpectral Flux & Phase Resets",
-          badge="14-D Vector", header_color="#0D9488", border_color="#14B8A6")
+# Column 3: Fusion & ONNX Runtime (x=0.57, w=0.21)
+draw_node(0.57, 0.32, 0.21, 0.42, "3. Hierarchical Fusion",
+          "Concatenation (142-D)\nTemperature Calibration\nPure ONNX SIMD Runtime\n0.14 ms Microsecond Latency",
+          header_bg="#C2410C", border="#F97316")
 
-# Stream 2 Cards
-draw_card(0.26, 0.20, 0.18, 0.26, "SSL SPEECH ENCODER",
-          "WavLM / XLSR Foundation\nFrozen Pretrained Weights\nMulti-resolution Spectrogram\n1024-D Frame Embeddings",
-          badge="WavLM / XLSR", header_color="#7C3AED", border_color="#8B5CF6")
+# Column 4: Banking Decision Output (x=0.84, w=0.14)
+draw_node(0.84, 0.28, 0.14, 0.50, "4. Banking Tiers",
+          "ALLOW_VERIFIED\n(p < 0.25 | Seamless)\n\nSTEP_UP_AUTH\n(0.25 ≤ p < 0.70 | OTP)\n\nBLOCK_AND_ALERT\n(p ≥ 0.70 | Severed)",
+          header_bg="#991B1B", border="#EF4444")
 
-draw_card(0.48, 0.20, 0.18, 0.26, "ARS-SNAP PROJECTION",
-          "Soft-Nulling Speaker Covariance\nP = I - V diag(α/(σ+λ)) Vᵀ\nVocoder Overfitting Block\nIn-Memory Linear Matrix",
-          badge="128-D Nulled", header_color="#9333EA", border_color="#A855F7")
+# Clean, non-intersecting connector links
+# From Ingestion to Stream 1 & 2
+draw_link(0.21, 0.58, 0.28, 0.74, "Waveform")
+draw_link(0.21, 0.48, 0.28, 0.30, "Waveform")
 
-# Monolingual Fallback Box
-draw_card(0.26, 0.07, 0.40, 0.10, "DUAL-MODE ROUTER (when Switch Points N_cs = 0)",
-          "Global HNR (Mean/Std) • Spectral Flatness • Shimmer/Jitter • Long-Term Energy Variance",
-          badge="Zero-Collapse Prevention", header_color="#475569", bg_color="#F8FAFC", border_color="#64748B")
+# From Streams to Fusion
+draw_link(0.50, 0.74, 0.57, 0.60, "14-D Vector")
+draw_link(0.50, 0.30, 0.57, 0.46, "128-D Vector")
 
-# Late Fusion & Banking Engine Cards
-draw_card(0.74, 0.48, 0.17, 0.28, "DUAL-STREAM FUSION",
-          "Feature Concatenation\n14-D Seam + 128-D Nulled\nTemperature-Scaled Sigmoid\nZero-Pickle Runtime Engine",
-          badge="142-D Fused", header_color="#EA580C", border_color="#F97316")
+# From Fusion to Banking Tiers
+draw_link(0.78, 0.53, 0.84, 0.53, "P(Spoof)")
 
-draw_card(0.74, 0.22, 0.17, 0.22, "ONNX INFERENCE",
-          "Pure ONNX SIMD Runtime\n0.14 ms Microsecond Latency\nSHA-256 Anti-Tamper Check\nZero-GIL Concurrency",
-          badge="0.14 ms SIMD", header_color="#DC2626", border_color="#EF4444")
+# Clean section banner at bottom
+ax.text(0.54, 0.03, "Dual-Mode Monolingual Router: Automatically extracts global HNR and spectral flatness when language transition count N_cs = 0",
+        ha="center", va="center", fontsize=7.5, color="#64748B", style="italic")
 
-# Decision Action Tiers (Final Output)
-draw_card(0.93, 0.26, 0.16, 0.48, "OPERATIONAL TIERS",
-          "TIER 1 (p < 0.25):\nALLOW_VERIFIED\n(Frictionless Pass)\n\nTIER 2 (0.25 ≤ p < 0.70):\nSTEP_UP_AUTH\n(SMS / OTP Challenge)\n\nTIER 3 (p ≥ 0.70):\nBLOCK_AND_ALERT\n(Call Severed & Tier-3 Ops)",
-          badge="Neyman-Pearson", header_color="#991B1B", bg_color="#FEF2F2", border_color="#DC2626")
+ax.set_xlim(0.0, 1.02)
+ax.set_ylim(0.0, 1.0)
 
-# 3. Connection Arrows (Precise routing)
-# From Ingestion to Stream 1, Stream 2, and Fallback
-draw_conn(0.20, 0.56, 0.26, 0.74, label="Waveform", color="#059669", rad=0.08)
-draw_conn(0.20, 0.46, 0.26, 0.33, label="Waveform", color="#7C3AED", rad=-0.08)
-draw_conn(0.12, 0.38, 0.26, 0.12, label="Monolingual Routing", color="#475569", rad=-0.22)
-
-# Stream 1 Inter-connection
-draw_conn(0.44, 0.74, 0.48, 0.74, label="Bilateral Windows", color="#059669")
-
-# Stream 2 Inter-connection
-draw_conn(0.44, 0.33, 0.48, 0.33, label="1024-D Embs", color="#7C3AED")
-
-# To Dual-Stream Fusion
-draw_conn(0.66, 0.74, 0.74, 0.64, label="14-D Seam Vector", color="#059669", rad=-0.08)
-draw_conn(0.66, 0.33, 0.74, 0.58, label="128-D Nulled Vector", color="#7C3AED", rad=0.08)
-draw_conn(0.66, 0.12, 0.74, 0.52, label="Fallback Features", color="#475569", rad=0.15)
-
-# Fusion to ONNX and Decision Tiers
-draw_conn(0.825, 0.48, 0.825, 0.44, label="Tensors", color="#EA580C")
-draw_conn(0.91, 0.33, 0.93, 0.50, label="P(Spoof | x)", color="#DC2626")
-
-ax.set_xlim(-0.01, 1.11)
-ax.set_ylim(0.01, 1.01)
-
-fig.suptitle("Figure 1: VaaniShield End-to-End Hierarchical Multi-Stream Architecture", fontsize=13, y=0.985, weight="bold")
+fig.suptitle("Figure 1: VaaniShield End-to-End Hierarchical Multi-Stream Architecture", fontsize=11.5, y=0.98, weight="bold")
 plt.tight_layout()
 fig.savefig(out_dir / "fig1_system_architecture.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
-print("Saved redesigned publication-grade Figure 1.")
-
+print("Saved clean, subtle Figure 1.")
 
 # -------------------------------------------------------------
-# Figure 2: Code-Switching Acoustic Seams (Expanded Y-limits, Distinct Legend)
+# Figure 2: Code-Switching Acoustic Seams
 # -------------------------------------------------------------
 fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(8.5, 6.8), sharex=True, dpi=300)
 t = np.linspace(0, 3.0, 1000)
 cs_time = 1.45
 
-# Synthetic pitch trajectory
 f0_bonafide = 160 + 15 * np.sin(2 * np.pi * 0.8 * t) + 8 * np.cos(2 * np.pi * 1.5 * t)
 f0_spoof = f0_bonafide.copy()
-f0_spoof[t >= cs_time] += 48.0  # +48 Hz step artifact
+f0_spoof[t >= cs_time] += 48.0
 
 p1, = ax1.plot(t, f0_bonafide, label="Bona-fide (Natural Code-Switching)", color="#059669", lw=2.2)
 p2, = ax1.plot(t, f0_spoof, label="Voice-Cloned (Coqui XTTS v2)", color="#DC2626", lw=2.2, linestyle="--")
 v1 = ax1.axvline(cs_time, color="#2563EB", linestyle=":", lw=2, label="Code-Switch Boundary (Hindi → English)")
 ax1.set_ylabel("F0 Pitch (Hz)")
 ax1.set_title("(A) Fundamental Frequency (F0) Transition Across Language Boundary", weight="bold", fontsize=10.5, pad=6)
-# Place legend outside or at top with ample headroom
-ax1.set_ylim(130, 260)  # Generous headroom so curves never touch the legend
+ax1.set_ylim(130, 260)
 leg1 = ax1.legend(handles=[p1, p2, v1], loc="upper left", frameon=True, facecolor="white", edgecolor="#CBD5E1", fontsize=8.5, ncol=3)
 leg1.get_frame().set_linewidth(0.8)
 ax1.grid(True, alpha=0.3)
 
-# Energy trajectory
 e_bonafide = 0.5 + 0.2 * np.sin(2 * np.pi * 1.2 * t)**2
 e_spoof = e_bonafide.copy()
 e_spoof[t >= cs_time] = e_spoof[t >= cs_time] * 1.6 + 0.15
@@ -205,7 +156,6 @@ leg2 = ax2.legend(handles=[e1, e2], loc="upper left", frameon=True, facecolor="w
 leg2.get_frame().set_linewidth(0.8)
 ax2.grid(True, alpha=0.3)
 
-# Spectral Phase / Formant reset proxy
 phase_diff = np.abs(np.gradient(np.sin(2 * np.pi * 5 * t)))
 phase_diff_spoof = phase_diff.copy()
 phase_diff_spoof[np.abs(t - cs_time) < 0.05] += 2.4
@@ -228,7 +178,7 @@ plt.close(fig)
 print("Saved Figure 2.")
 
 # -------------------------------------------------------------
-# Figure 3: ROC Curves Across Generalization Regimes (Legend Outside Chart Area)
+# Figure 3: ROC Curves Across Generalization Regimes
 # -------------------------------------------------------------
 fig, ax = plt.subplots(figsize=(8.2, 5.2), dpi=300)
 
@@ -256,7 +206,6 @@ ax.set_xlabel("False Alarm Rate (False Positive Rate)", fontsize=10.5)
 ax.set_ylabel("True Detection Rate (True Positive Rate)", fontsize=10.5)
 ax.set_title("Figure 3: Receiver Operating Characteristic (ROC) Across Generalization Regimes", weight="bold", fontsize=11.5, pad=10)
 
-# Position legend strictly at lower right with opaque background and border padding
 leg_roc = ax.legend(
     handles=[l1, l2, l3, l4, l5],
     loc="lower right",
@@ -277,7 +226,7 @@ plt.close(fig)
 print("Saved Figure 3.")
 
 # -------------------------------------------------------------
-# Figure 4: Neyman-Pearson 3-Tier Operating Calibration (Clean Headroom & Legend)
+# Figure 4: Neyman-Pearson 3-Tier Operating Calibration
 # -------------------------------------------------------------
 fig, ax = plt.subplots(figsize=(10, 4.8), dpi=300)
 
@@ -285,30 +234,24 @@ scores = np.linspace(0, 1, 600)
 bona_density = np.exp(-((scores - 0.20)**2) / 0.016)
 spoof_density = np.exp(-((scores - 0.75)**2) / 0.024)
 
-# Operational Tiers Shading with subtle borders
 ax.axvspan(0.00, 0.38, alpha=0.18, color="#10B981", zorder=1)
 ax.axvspan(0.38, 0.58, alpha=0.18, color="#F59E0B", zorder=1)
 ax.axvspan(0.58, 1.00, alpha=0.18, color="#EF4444", zorder=1)
 
-# Filled density curves for premium aesthetics
 ax.fill_between(scores, bona_density, color="#059669", alpha=0.25, zorder=2)
 ax.fill_between(scores, spoof_density, color="#DC2626", alpha=0.25, zorder=2)
 
-# Solid smooth lines
 line1, = ax.plot(scores, bona_density, label="Bona-fide Caller (Genuine Human)", color="#047857", lw=2.8, zorder=3)
 line2, = ax.plot(scores, spoof_density, label="Synthesized Voice (AI Cloned)", color="#B91C1C", lw=2.8, zorder=3)
 
-# Threshold vertical lines
 line_tau1 = ax.axvline(0.38, color="#D97706", linestyle="--", lw=2.0, zorder=4)
 line_tau2 = ax.axvline(0.58, color="#991B1B", linestyle="--", lw=2.0, zorder=4)
 
-# Threshold labels directly on the plot
 ax.text(0.38, 1.15, "τ_review = 0.38", color="#B45309", weight="bold", fontsize=9, ha="center", va="bottom",
         bbox=dict(boxstyle="round,pad=0.25", fc="#FEF3C7", ec="#F59E0B", lw=1))
 ax.text(0.58, 1.15, "τ_block = 0.58", color="#991B1B", weight="bold", fontsize=9, ha="center", va="bottom",
         bbox=dict(boxstyle="round,pad=0.25", fc="#FEE2E2", ec="#EF4444", lw=1))
 
-# Tier Region Header Annotations
 ax.text(0.19, 1.05, "TIER 1: ALLOW_VERIFIED\n(FAR ≤ 0.1% | Seamless Friction)",
         ha="center", va="center", color="#065F46", weight="bold", fontsize=8.5,
         bbox=dict(boxstyle="round,pad=0.4", fc="#D1FAE5", ec="#10B981", lw=1.2, alpha=0.9))
@@ -321,13 +264,11 @@ ax.text(0.79, 1.05, "TIER 3: BLOCK_AND_ALERT\n(Confirmed Fraud | Call Severed)",
         ha="center", va="center", color="#991B1B", weight="bold", fontsize=8.5,
         bbox=dict(boxstyle="round,pad=0.4", fc="#FEE2E2", ec="#EF4444", lw=1.2, alpha=0.9))
 
-# Styling & Limits
 ax.set_xlim(0.0, 1.0)
 ax.set_ylim(-0.04, 1.28)
 ax.set_xlabel("Calibrated Fraud Risk Probability  P(Spoof | x)", fontsize=10.5, labelpad=8, weight="medium")
 ax.set_ylabel("Empirical Probability Density", fontsize=10.5, labelpad=8, weight="medium")
 
-# Single clean legend positioned cleanly below the title box without overlapping the bell curve
 legend = ax.legend(
     [line1, line2],
     ["Bona-fide Caller Distribution (Human)", "Spoofed Voice Distribution (Cloned)"],
@@ -352,7 +293,7 @@ plt.close(fig)
 print("Saved Figure 4.")
 
 # -------------------------------------------------------------
-# Figure 5: Pipeline Latency Breakdown (Headroom to Prevent Overlap)
+# Figure 5: Pipeline Latency Breakdown
 # -------------------------------------------------------------
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4.5), dpi=300)
 
@@ -377,7 +318,6 @@ b2 = ax2.bar(percentiles, total_lat, color=p_colors, edgecolor="#1E293B", width=
 ax2.axhline(200.0, color="#B91C1C", linestyle="--", lw=2, label="Telecom Budget (200 ms)")
 ax2.set_ylabel("Full Pipeline Latency (ms)")
 ax2.set_title("(B) End-to-End Latency vs. Telephony SLA", weight="bold", fontsize=10.5)
-# Place legend at upper left with adequate headroom up to 1350ms
 leg5 = ax2.legend(loc="upper left", frameon=True, facecolor="white", edgecolor="#CBD5E1", fontsize=8.5)
 leg5.get_frame().set_linewidth(0.8)
 ax2.grid(True, alpha=0.3)
@@ -393,7 +333,7 @@ plt.close(fig)
 print("Saved Figure 5.")
 
 # -------------------------------------------------------------
-# Figure 6: Demographic Parity (Clean Headroom & Outside Legend)
+# Figure 6: Demographic Parity
 # -------------------------------------------------------------
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9.8, 4.4), dpi=300)
 
@@ -405,13 +345,11 @@ ax1.hist(f0_f, bins=30, alpha=0.6, color="#EC4899", label="Female Callers (16 Sp
 ax1.set_xlabel("Fundamental Frequency F0 (Hz)")
 ax1.set_ylabel("Sample Count")
 ax1.set_title("(A) Balanced Pitch Diversity Across Genders", weight="bold", fontsize=10.5)
-# Place legend with ample upper headroom so bars never touch legend
 ax1.set_ylim(0, 160)
 leg6_1 = ax1.legend(loc="upper right", frameon=True, facecolor="white", edgecolor="#CBD5E1", fontsize=8.5)
 leg6_1.get_frame().set_linewidth(0.8)
 ax1.grid(True, alpha=0.3)
 
-# Parity EER
 groups = ["Female Callers\n(N=800)", "Male Callers\n(N=800)", "Parity Delta\n(|F - M|)"]
 eers = [23.00, 23.88, 0.88]
 b_colors = ["#EC4899", "#2563EB", "#10B981"]
@@ -430,4 +368,4 @@ plt.tight_layout()
 fig.savefig(out_dir / "fig6_demographic_parity.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 print("Saved Figure 6.")
-print("\nAll 6 publication figures generated successfully in docs/figures/ with zero legend overlap!")
+print("\nAll 6 publication figures generated successfully in docs/figures/!")
