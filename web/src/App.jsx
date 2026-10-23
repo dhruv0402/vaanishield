@@ -85,6 +85,8 @@ export default function App() {
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [isStreamingGuard, setIsStreamingGuard] = useState(false);
   const [streamTelemetry, setStreamTelemetry] = useState(null);
+  const [showMobileHud, setShowMobileHud] = useState(false);
+  const [callerNumber, setCallerNumber] = useState("+91 98450 12891");
   const wsStreamRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -650,6 +652,27 @@ export default function App() {
                     ⏹️ Halt Guard
                   </button>
                 )}
+
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{
+                    borderColor: "rgba(59, 130, 246, 0.5)",
+                    color: "#93c5fd",
+                    background: "rgba(59, 130, 246, 0.12)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                  onClick={() => {
+                    setShowMobileHud(true);
+                    if (!isStreamingGuard) {
+                      startStreamingGuard();
+                    }
+                  }}
+                >
+                  📱 Phone Screen HUD
+                </button>
               </div>
 
               {/* Live Streaming Call Guard Status HUD */}
@@ -1243,6 +1266,139 @@ export default function App() {
             In compliance with India's Digital Personal Data Protection Act (DPDPA 2023), VaaniShield performs strictly non-semantic acoustic analysis. Audio is evaluated strictly for physical vocal tract and vocoder anomalies; speech content is never recorded, transcribed, or stored in persistent databases.
           </p>
         </article>
+      )}
+
+      {/* Truecaller-Style Smartphone Caller HUD Modal */}
+      {showMobileHud && (
+        <div className="mobile-guard-modal-backdrop" onClick={() => setShowMobileHud(false)}>
+          <div
+            className={`phone-device-frame ${
+              streamTelemetry?.spoof_probability > 0.5 ? "vibrating" : ""
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top Notch & Camera */}
+            <div className="phone-speaker-notch">
+              <div className="phone-camera-lens"></div>
+              <div className="phone-speaker-grille"></div>
+            </div>
+
+            {/* Truecaller-style HUD Card Overlay */}
+            <div
+              className={`truecaller-hud-card ${
+                !streamTelemetry || streamTelemetry.spoof_probability === undefined
+                  ? "safe"
+                  : streamTelemetry.spoof_probability > 0.52
+                  ? "danger"
+                  : streamTelemetry.spoof_probability > 0.38
+                  ? "warning"
+                  : "safe"
+              }`}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "20px" }}>
+                    {!streamTelemetry || streamTelemetry.spoof_probability <= 0.38
+                      ? "🟢"
+                      : streamTelemetry.spoof_probability > 0.52
+                      ? "🔴"
+                      : "🟡"}
+                  </span>
+                  <div>
+                    <div style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", opacity: 0.9 }}>
+                      VaaniShield Live Call Guard
+                    </div>
+                    <div style={{ fontSize: "15px", fontWeight: 800 }}>
+                      {!streamTelemetry || streamTelemetry.spoof_probability <= 0.38
+                        ? "Caller Verified Authentic"
+                        : streamTelemetry.spoof_probability > 0.52
+                        ? "⚠️ DANGER: AI Voice Clone Detected!"
+                        : "Uncertain — Exercise Caution"}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: "10px", opacity: 0.8 }}>RISK SCORE</div>
+                  <div style={{ fontSize: "16px", fontWeight: 900, fontFamily: "var(--font-mono)" }}>
+                    {streamTelemetry?.spoof_probability !== undefined
+                      ? `${(streamTelemetry.spoof_probability * 100).toFixed(0)}%`
+                      : "12%"}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ fontSize: "11px", lineHeight: "1.4", opacity: 0.95 }}>
+                {!streamTelemetry || streamTelemetry.spoof_probability <= 0.38
+                  ? "Vocal tract continuity verified across code-switch boundaries. Safe to proceed."
+                  : streamTelemetry.spoof_probability > 0.52
+                  ? "Do NOT transfer money or share OTPs. Synthetic neural vocoder artifacts flagged in real-time."
+                  : "Acoustic distortion or packet loss smearing detected. Step-up authentication advised."}
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", opacity: 0.85, paddingTop: "4px", borderTop: "1px solid rgba(255,255,255,0.2)" }}>
+                <span>Latency: ~127ms</span>
+                <span>DPDPA Privacy Compliant</span>
+                <span>Buffer: {streamTelemetry?.buffer_duration_sec || 2.5}s</span>
+              </div>
+            </div>
+
+            {/* In-Call Screen Details */}
+            <div className="call-screen-body">
+              <div className="caller-avatar-circle">
+                👤
+              </div>
+              <div style={{ fontSize: "20px", fontWeight: 800, color: "white", marginBottom: "4px" }}>
+                Unknown Caller
+              </div>
+              <div style={{ fontSize: "14px", color: "#94a3b8", marginBottom: "16px", fontFamily: "var(--font-mono)" }}>
+                {callerNumber}
+              </div>
+
+              <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(30, 41, 59, 0.8)", padding: "6px 12px", borderRadius: "20px", fontSize: "12px", color: "#cbd5e1" }}>
+                <span className="pulse-dot" style={{ background: "#38bdf8" }}></span>
+                <span>Call in progress (00:18)</span>
+              </div>
+
+              {/* Dynamic Warning Banner inside Call screen if Danger */}
+              {streamTelemetry?.spoof_probability > 0.52 && (
+                <div style={{ marginTop: "24px", padding: "10px 14px", background: "rgba(239, 68, 68, 0.2)", border: "1px solid #ef4444", borderRadius: "10px", color: "#fca5a5", fontSize: "12px", fontWeight: 700 }}>
+                  🚨 Banking Alert: Synthetic Voice Spoofing Intercepted
+                </div>
+              )}
+            </div>
+
+            {/* Call Screen Bottom Control Actions */}
+            <div className="call-actions-row">
+              <button
+                type="button"
+                className="call-action-btn btn-decline"
+                title="Reject Fraudulent Call"
+                onClick={() => {
+                  stopStreamingGuard();
+                  setShowMobileHud(false);
+                }}
+              >
+                📞
+              </button>
+              <button
+                type="button"
+                className="call-action-btn"
+                style={{ background: "#334155" }}
+                title="Mute Call"
+              >
+                🔇
+              </button>
+              <button
+                type="button"
+                className="call-action-btn btn-answer"
+                title="Allow Verified Call"
+                onClick={() => setShowMobileHud(false)}
+              >
+                ✓
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Footer */}
