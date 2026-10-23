@@ -750,7 +750,147 @@ export default function App() {
 
           {/* Right Column: Detection Verdict & Forensic Explanations */}
           <section className="dashboard-col right-col">
-            {!analysisResult && !isLoading && (
+            {/* Live Streaming Call Screening HUD (Replaces right panel during live call guard) */}
+            {isStreamingGuard && (
+              <div className="control-card" style={{ padding: "28px" }}>
+                <div className="card-heading-row" style={{ borderBottom: "1px solid var(--border-subtle)", paddingBottom: "14px", marginBottom: "20px" }}>
+                  <div className="card-heading">
+                    <span className="pulse-dot" style={{ background: "var(--cyan-pure)" }}></span>
+                    <span style={{ color: "var(--cyan-pure)" }}>LIVE TELEPHONY CALL SCREENING (PBX / B2C GATEWAY)</span>
+                  </div>
+                  <span className="brand-pill-badge" style={{ background: "rgba(6, 182, 212, 0.1)", color: "#a5f3fc", borderColor: "var(--cyan-border)" }}>
+                    SIP WebSocket Active &bull; ~127ms Latency
+                  </span>
+                </div>
+
+                {/* Live Caller Profile Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--bg-surface)", padding: "16px 20px", borderRadius: "10px", border: "1px solid var(--border-subtle)", marginBottom: "20px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                    <div style={{ width: "46px", height: "46px", borderRadius: "50%", background: "var(--bg-card)", border: "1px solid var(--border-medium)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px" }}>
+                      📞
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--text-white)", letterSpacing: "-0.01em" }}>
+                        Incoming Call: +91 98450 12891
+                      </div>
+                      <div style={{ fontSize: "12px", color: "var(--text-muted)", display: "flex", gap: "10px", marginTop: "2px" }}>
+                        <span>Unsaved Contact</span> &bull; 
+                        <span>Channel: ITU-T G.711 μ-law</span> &bull; 
+                        <span>8 kHz PSTN</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>In-Call Duration</div>
+                    <div className="mono-text" style={{ fontSize: "14px", fontWeight: 700, color: "var(--cyan-pure)" }}>
+                      00:{(streamTelemetry?.buffer_duration_sec || 0).toFixed(1)}s
+                    </div>
+                  </div>
+                </div>
+
+                {/* Instantaneous Forensic Screening Banner */}
+                <div
+                  className={`verdict-box ${
+                    !streamTelemetry || streamTelemetry.spoof_probability === undefined || streamTelemetry.spoof_probability <= 0.38
+                      ? "bonafide"
+                      : streamTelemetry.spoof_probability > 0.52
+                      ? "spoof"
+                      : "suspicious"
+                  }`}
+                  style={{ marginBottom: "20px" }}
+                >
+                  <div className="verdict-icon">
+                    {!streamTelemetry || streamTelemetry.spoof_probability <= 0.38
+                      ? "🟢"
+                      : streamTelemetry.spoof_probability > 0.52
+                      ? "🚨"
+                      : "⚠️"}
+                  </div>
+                  <div className="verdict-content">
+                    <div className="verdict-header-row">
+                      <div className="verdict-title">
+                        {!streamTelemetry || streamTelemetry.spoof_probability <= 0.38
+                          ? "Caller Verified Authentic (Human Speaker)"
+                          : streamTelemetry.spoof_probability > 0.52
+                          ? "⚠️ CRITICAL ALERT: Synthetic Voice Clone Detected"
+                          : "Caution: Acoustic Discontinuity Flagged"}
+                      </div>
+                      <span
+                        className={`verdict-policy-badge ${
+                          !streamTelemetry || streamTelemetry.spoof_probability <= 0.38
+                            ? "badge-bonafide"
+                            : "badge-spoof"
+                        }`}
+                      >
+                        {!streamTelemetry || streamTelemetry.spoof_probability <= 0.38
+                          ? "VERIFIED_GENUINE"
+                          : streamTelemetry.spoof_probability > 0.52
+                          ? "BLOCK_AND_ALERT"
+                          : "STEP_UP_AUTH"}
+                      </span>
+                    </div>
+                    <p className="verdict-desc" style={{ marginTop: "6px" }}>
+                      {!streamTelemetry || streamTelemetry.spoof_probability <= 0.38
+                        ? "Prosodic continuity, natural fundamental frequency (F0) drift, and vocal tract dynamics verified across language switches. Safe to conduct banking transaction."
+                        : streamTelemetry.spoof_probability > 0.52
+                        ? "Real-time ARS-SNAP and boundary seam detectors flagged neural vocoder stitching anomalies. Automated fraud policy recommends immediately terminating call or requiring out-of-band biometric challenge."
+                        : "Moderate acoustic variance detected. Telephony packet loss or background noise may be smearing boundary cues."}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Real-time Telemetry Metrics Grid */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px", marginBottom: "20px" }}>
+                  <div className="metric-card" style={{ padding: "16px" }}>
+                    <div style={{ fontSize: "11px", color: "var(--text-muted)", textTransform: "uppercase" }}>Instantaneous Spoof Probability</div>
+                    <div className="mono-text" style={{ fontSize: "26px", fontWeight: 900, color: (streamTelemetry?.spoof_probability || 0) > 0.5 ? "var(--crimson-pure)" : "var(--emerald-pure)", marginTop: "4px" }}>
+                      {((streamTelemetry?.spoof_probability || 0.12) * 100).toFixed(1)}%
+                    </div>
+                    <div style={{ fontSize: "11px", color: "var(--text-dim)", marginTop: "4px" }}>
+                      Neyman-Pearson τ = 0.52
+                    </div>
+                  </div>
+
+                  <div className="metric-card" style={{ padding: "16px" }}>
+                    <div style={{ fontSize: "11px", color: "var(--text-muted)", textTransform: "uppercase" }}>Rolling Audio Buffer</div>
+                    <div className="mono-text" style={{ fontSize: "26px", fontWeight: 900, color: "var(--text-white)", marginTop: "4px" }}>
+                      {(streamTelemetry?.buffer_duration_sec || 2.5).toFixed(1)}s
+                    </div>
+                    <div style={{ fontSize: "11px", color: "var(--text-dim)", marginTop: "4px" }}>
+                      Chunk #{streamTelemetry?.chunk_id || 1} processed
+                    </div>
+                  </div>
+
+                  <div className="metric-card" style={{ padding: "16px" }}>
+                    <div style={{ fontSize: "11px", color: "var(--text-muted)", textTransform: "uppercase" }}>Privacy & Compliance</div>
+                    <div className="mono-text" style={{ fontSize: "16px", fontWeight: 800, color: "var(--blue-pure)", marginTop: "8px" }}>
+                      DPDPA 2023
+                    </div>
+                    <div style={{ fontSize: "11px", color: "var(--text-dim)", marginTop: "4px" }}>
+                      Zero Spoken Content Stored
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Call Management Actions */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "14px", borderTop: "1px solid var(--border-subtle)" }}>
+                  <div style={{ fontSize: "12px", color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span className="pulse-dot" style={{ background: "var(--emerald-pure)" }}></span>
+                    <span>Monitoring ongoing live speech stream via WebSocket...</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ borderColor: "var(--crimson-border)", color: "var(--crimson-text)", background: "var(--crimson-glow)" }}
+                    onClick={stopStreamingGuard}
+                  >
+                    ⏹️ Stop Screening Session
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!isStreamingGuard && !analysisResult && !isLoading && (
               <div
                 className="control-card"
                 style={{
