@@ -1,0 +1,13 @@
+# CPU API runtime for the default statistical embedding + NPZ/checkpoint pipeline.
+# Optional neural ASR, training and export tooling remain in requirements.txt.
+numpy>=1.26,<2
+scipy>=1.12,<2
+scikit-learn>=1.4,<2
+librosa>=0.10.2,<1
+soundfile>=0.12.1,<1
+praat-parselmouth>=0.4.3,<1
+fastapi>=0.110,<1
+uvicorn[standard]>=0.28,<1
+python-multipart>=0.0.9,<1
+reportlab>=4.2,<5
+pyyaml>=6.0.1,<7

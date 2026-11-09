@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import pickle
 import tempfile
@@ -74,6 +75,16 @@ PROJECTOR = None
 CFG = None
 WHISPER_MODEL = None
 
+logger = logging.getLogger(__name__)
+MODEL_UNAVAILABLE = {
+    "code": "model_unavailable",
+    "message": "A trusted model and its checksum must be provisioned before inference.",
+}
+
+
+class ModelUnavailableError(RuntimeError):
+    """The configured model or its configuration could not be loaded safely."""
+
 
 def get_whisper():
     global WHISPER_MODEL
@@ -92,23 +103,41 @@ def get_pipeline():
     if MODEL is None:
         from vaanishield.fusion.classifier import FusionClassifier
         zero_pickle_path = "checkpoints/onnx/model_parameters.npz"
-        if os.path.exists(zero_pickle_path):
-            data = FusionClassifier.load_zero_pickle(zero_pickle_path, verify_checksum=True)
-            print("[VaaniShield Security] Initialized Zero-Pickle Secure Pipeline (SHA-256 verified, 0 pickle deserialization).")
-        elif os.path.exists(CHECKPOINT_PATH):
-            data = FusionClassifier.load_checkpoint(CHECKPOINT_PATH, verify_checksum=True)
-        else:
-            raise RuntimeError(f"No checkpoint found at {zero_pickle_path} or {CHECKPOINT_PATH}.")
-        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-            CFG = yaml.safe_load(f)
-        MODEL = data["model"]
-        PROJECTOR = data["projector"]
+        try:
+            if os.path.exists(zero_pickle_path):
+                data = FusionClassifier.load_zero_pickle(zero_pickle_path, verify_checksum=True)
+            elif os.path.exists(CHECKPOINT_PATH):
+                data = FusionClassifier.load_checkpoint(CHECKPOINT_PATH, verify_checksum=True)
+            else:
+                raise FileNotFoundError("No trained checkpoint was provisioned.")
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                cfg = yaml.safe_load(f)
+            model, projector = data["model"], data["projector"]
+            if model is None or projector is None or not isinstance(cfg, dict):
+                raise ValueError("Incomplete model or invalid configuration.")
+        except Exception as exc:
+            logger.warning("Model initialization failed: %s", exc)
+            raise ModelUnavailableError(MODEL_UNAVAILABLE["message"]) from exc
+        # Publish the cache only after all required components load successfully.
+        PROJECTOR, CFG = projector, cfg
+        MODEL = model
     return MODEL, PROJECTOR, CFG
 
 
 @app.get("/api/health")
 def health():
+    """Process liveness only; use /api/ready before sending inference traffic."""
     return {"status": "ok", "service": "VaaniShield Detection API", "version": "2.0.0"}
+
+
+@app.get("/api/ready")
+def readiness():
+    """Check model loading and checksum verification, not detector accuracy."""
+    try:
+        get_pipeline()
+    except ModelUnavailableError:
+        return JSONResponse(status_code=503, content={"status": "unavailable", **MODEL_UNAVAILABLE})
+    return {"status": "ready", "service": "VaaniShield Detection API"}
 
 
 SAMPLE_CATALOG = [
@@ -317,6 +346,8 @@ async def analyze_audio(
             "explanations": explanations,
         }
 
+    except ModelUnavailableError:
+        raise HTTPException(status_code=503, detail=MODEL_UNAVAILABLE)
     except HTTPException:
         raise
     except Exception as e:
@@ -438,7 +469,12 @@ async def dispatch_policy_webhook(req: PolicyWebhookRequest):
 async def websocket_stream_analyze(websocket: WebSocket):
     """Real-time streaming WebSocket endpoint for continuous audio chunk analysis."""
     await websocket.accept()
-    model, projector, cfg = get_pipeline()
+    try:
+        model, projector, cfg = get_pipeline()
+    except ModelUnavailableError:
+        await websocket.send_json({"type": "error", **MODEL_UNAVAILABLE})
+        await websocket.close(code=1013, reason="Model unavailable")
+        return
     buffer = np.zeros(0, dtype=np.float32)
     sr = 8000
     chunk_count = 0

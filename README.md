@@ -143,6 +143,46 @@ Checksum verification now requires a matching sidecar. Both `model.npz.sha256` a
 reference, not publisher identity, and does not make pickle safe. Prefer NPZ/ONNX for
 inference. Never load untrusted pickle checkpoints.
 
+### Container build and model provisioning
+
+The default image contains the CPU API runtime and built dashboard, **not a trained
+model**. It builds from a clean checkout without private checkpoint files. Optional
+Whisper/neural ASR, training and export dependencies are not installed in this image;
+the default statistical embedding and acoustic localization fallback remain available.
+
+```bash
+docker build -t vaanishield:local .
+docker run --rm -p 127.0.0.1:8000:8000 vaanishield:local
+# In another terminal, verify the model-free image:
+python scripts/smoke_container.py
+```
+
+`/api/health` is process liveness and stays HTTP 200 without a model. `/api/ready`
+attempts to load and verify the configured model and returns HTTP 503 until successful.
+Without a usable model, `/api/analyze` returns HTTP 503 with `model_unavailable`, and
+the streaming endpoint sends that error and closes with code 1013. No predictions are
+generated as a fallback. Readiness means successful loading, not validated accuracy.
+
+For actual inference, supply your trusted artifacts and checksum sidecars in a local
+directory with the layout above, then mount that directory read-only:
+
+```bash
+docker run --rm -p 127.0.0.1:8000:8000 \
+  --mount type=bind,src=/absolute/path/to/trusted/checkpoints,dst=/app/checkpoints,readonly \
+  vaanishield:local
+curl --fail http://127.0.0.1:8000/api/ready
+```
+
+The API prefers `onnx/model_parameters.npz` inside the mount, with the legacy trusted
+`fusion_checkpoint.pkl` as an alternative. A failed NPZ verification does not silently
+fall back to pickle. Successful loads are cached per worker; restart the container to
+replace a loaded model. Missing catalog audio can be supplied separately if licensed.
+
+CI builds and starts the model-free image, checks the dashboard and liveness, and
+requires readiness and inference to reject requests with HTTP 503. This is a container
+integration test, not trained-model validation or a production deployment. The workflow
+does not publish the image or deploy a service.
+
 ## Repository map
 
 - `vaanishield/boundary/`: localization and acoustic features
