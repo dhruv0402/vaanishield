@@ -248,7 +248,7 @@ export default function App() {
           setAudioUrl(URL.createObjectURL(wavBlob));
           setSuccessMsg(`Recorded ${(decoded.duration).toFixed(1)}s audio.`);
           decodeCtx.close().catch(() => {});
-        } catch (convErr) {
+        } catch {
           const fallbackFile = new File([rawBlob], "mic_input.wav", { type: rawBlob.type });
           setUploadedFile(fallbackFile);
           setSelectedSample("");
