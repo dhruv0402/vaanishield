@@ -1,198 +1,165 @@
 # VaaniShield
 
-**Code-Switch-Aware Deepfake Voice Detection for Financial Fraud Calls in Indian Multilingual Speech**
+**A research prototype for code-switch-aware deepfake voice detection in Indian multilingual speech.**
 
-VaaniShield detects synthetic and voice-cloned segments in Indian code-switched (e.g. Hinglish)
-telephony speech by scoring acoustic discontinuities at the exact points where a speaker
-switches languages mid-sentence, fused with an orthogonal speaker-nulled global artifact stream
-so the model generalizes across unseen callers and accents.
+VaaniShield studies whether acoustic changes near language transitions help distinguish
+synthetic speech from human speech. It combines boundary features with a speaker-subspace
+projection and a calibrated two-stream classifier, with a FastAPI/React demo and streaming
+protocol support. It is not a validated banking fraud detector or an autonomous call-blocking
+system.
 
----
+## What the implementation does
 
-## 1. Why this project exists
+1. Locates boundaries from supplied transcript tokens, or acoustic spectral-flux changes
+   when a transcript is absent. An acoustic change point is not proof of a language switch.
+2. Measures pitch, energy, duration, formant and MFCC changes around those points.
+3. Extracts a 768-dimensional multi-resolution mel/MFCC statistical representation and
+   applies a fitted speaker-subspace projection. The default extractor is **not WavLM**,
+   despite legacy `ssl` variable names.
+4. Combines calibrated per-stream logistic regression predictions.
+5. Exposes upload/preset analysis, PDF summaries and experimental WebSocket streaming.
+   Call-control labels are recommendations. Supplying a webhook URL can send a real request;
+   leave it unset for local simulation.
 
-Voice-cloning fraud (fake "relative in distress", urgent loan verification, or bank impersonation) is an accelerating threat in India. Existing deepfake audio detectors are typically trained on monolingual English or Chinese datasets and treat the entire utterance as a single uniform clip.
+## Evidence and limitations
 
-In India, conversational speech is overwhelmingly **code-switched** (e.g., Hindi ↔ English, Kannada ↔ English, Tamil ↔ English). Voice-cloning engines (such as autoregressive token synthesizers and cross-lingual neural vocoders) often struggle with acoustic prosody transitions across phonetic inventories, leaving measurable acoustic "seams" (pitch jumps, energy steps, and formant phase resets).
+The checked-in reports are **historical artifacts**, not results reproduced by the test suite.
+The repository does not distribute the trained checkpoints or the complete audio corpus.
 
-VaaniShield evaluates this hypothesis: **Do cross-lingual boundary seam features, when combined with an orthogonal speaker-nulled global artifact stream, improve deepfake voice detection under telephony channel compression?**
+### Pilot benchmark
 
----
+[`results/evaluation_report.json`](results/evaluation_report.json) describes 400 records and
+8 speakers, with train/validation/test/held-out sizes of 200/50/100/50.
+Lower equal error rate (EER) is better.
 
-## 2. Architecture & Pipeline
+| Model | In-domain test EER | Held-out synthesizer EER |
+| --- | ---: | ---: |
+| Baseline A | 0.39 | **0.12** |
+| Baseline B | 0.48 | 0.14 |
+| VaaniShield fusion | **0.36** | 0.34 |
 
-```
-                    ┌──────────────────────────────────────────────┐
-                    │ Inbound Telephony Audio (8 kHz / 16 kHz)     │
-                    └──────────────────────┬───────────────────────┘
-                                           │
-                    ┌──────────────────────┴───────────────────────┐
-                    │  Acoustic VAD & Speech Duration Alignment    │
-                    └───────┬──────────────────────────────┬───────┘
-                            │                              │
-         ┌──────────────────▼────────────────┐  ┌──────────▼──────────────────────────┐
-         │ Boundary Stream (Local Seams)     │  │ Global Stream (Speaker-Invariant)   │
-         │ - Code-switch point localization  │  │ - Multi-scale CMN modulation & MFCCs │
-         │ - FastText LID + acoustic VAD     │  │ - SNAP Speaker-Nulling Projection   │
-         │ - F0 reset & pitch jumps (st)     │  │ - Orthogonal complement of speaker  │
-         │ - Energy step & Formant deltas    │  │   centroid covariance subspace      │
-         └──────────────────┬────────────────┘  └──────────┬──────────────────────────┘
-                            │                              │
-                            └──────────────┬───────────────┘
-                                           │
-                    ┌──────────────────────▼───────────────────────┐
-                    │ Multi-Stream L2 Shrinkage Fusion (C=0.01)    │
-                    │ - Calibrated Platt scaling (Sigmoid)         │
-                    │ - Operational Tiers: PASS / STEP-UP / BLOCK  │
-                    │ - 95% Bootstrap Confidence Intervals         │
-                    └──────────────────────┬───────────────────────┘
-                                           │
-                    ┌──────────────────────▼───────────────────────┐
-                    │ Telemetry & Privacy-Compliant Explanations   │
-                    │ - Spoof Probability & 95% Confidence Interval│
-                    │ - Acoustic Seam Attribution (Zero Transcript)│
-                    │ - DPDPA 2023 Non-Semantic Compliance         │
-                    └──────────────────────────────────────────────┘
-```
+The small in-domain point-estimate improvement does not establish superiority. The stored
+intervals overlap, and no paired significance test is supplied. Baseline A performs better
+on the held-out synthesizer. These results do not establish generalization to arbitrary
+callers, accents, synthesis systems or real fraud calls.
 
----
+The metric implementation now interpolates the ROC crossing for EER and resamples whole
+clusters without independently resampling the recordings inside them. Undefined EER or
+intervals are reported as unavailable rather than perfect performance. **Existing reports
+have not been regenerated with these corrections; their EERs and intervals need recomputation.**
+A one-speaker evaluation cannot estimate uncertainty across unseen speakers. Choose the
+resampling unit to match the claim and keep augmented versions of the same source together.
+The early-feature-fusion ablation is a different estimator from the main late-fusion
+classifier. Fresh ablation reports preserve their own computed results instead of copying
+metrics from another report. Equality checks require matching model/config/manifest identity.
 
-## 3. Benchmark Results (Strict Single Source of Truth)
+### Larger corpus and latency are separate experiments
 
-All metrics are evaluated across **4 strictly speaker-disjoint splits** (Train: 200, Val: 50, Test: 100, Held-Out Synthesizer: 50; N=400 total utterances) with identical 8000 Hz telephony filtering, distinct neural synthesizer architectures (Training/Test: Coqui XTTS v2; Held-Out: Microsoft Edge Neural TTS), and cluster bootstrap resampling grouped by `source_utterance_id`:
+- [`data/processed/scaled_master_manifest.jsonl`](data/processed/scaled_master_manifest.jsonl)
+  contains **1,600 records and 32 speakers**, split 750/150/350/350. The older 800-record,
+  16-speaker description is not the current manifest.
+- [`results/generalization_report.json`](results/generalization_report.json) describes that
+  larger corpus. Its overlapping regimes and all-record aggregates are not interchangeable
+  with the pilot's held-out test. Do not compare these numbers as a controlled improvement.
+- [`results/latency_profile.json`](results/latency_profile.json) records 75 runs over five
+  files: full-pipeline median **125.326 ms**, P95 **243.262 ms**, P99 **413.870 ms**.
+  The report itself says the **200 ms budget was not met**. These are stored measurements,
+  not a hardware-independent throughput guarantee.
+- Balanced demographic counts do not demonstrate fairness. Neither these experiments nor
+  ONNX serialization establish regulatory compliance, certification or production readiness.
+- Per-call fields named `confidence_interval_95` in the demo are legacy model-dispersion
+  heuristics, **not validated 95% statistical coverage or a probability that a caller is safe**.
+  ONNX's current `predict_with_ci` uses assumed noise, not a measured uncertainty model.
 
-| Model Configuration | Validation EER | In-Domain Test EER | 95% Bootstrap CI | Held-Out Synthesizer EER | Test Precision / Recall |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| Baseline A (Generic Acoustic + LR) | 0.2400 | 0.3900 | [0.2586, 0.5201] | 0.1200 | 66.0% / 62.0% |
-| Baseline B (Indian Accent Mel + LFCC) | 0.3400 | 0.4800 | [0.2881, 0.5700] | 0.1400 | 56.9% / 66.0% |
-| **VaaniShield Hierarchical Late Fusion** | **0.2800** | **0.3600** | **[0.2072, 0.4986]** | **0.3400** | **59.3% / 64.0%** |
+## Reproducible software checks
 
-### Three-Way Ablation Analysis (Scientific Finding)
+Use Python **3.12** and Node **22.12+**. The smaller CPU test environment does not download
+pretrained models or voice-cloning engines:
 
-Ablation evaluating individual and combined stream contributions across test and held-out sets:
-
-| Stream / Variant | Test Set EER | Held-Out Synthesizer EER | Core Finding & Architectural Role |
-| :--- | :---: | :---: | :--- |
-| **Boundary-Local Stream Only** | 0.5100 | 0.7000 | Under narrowband telephony loss, local boundary cues alone degrade to chance without global vocoder conditioning. |
-| **Speaker-Nulled Global Stream Only** | 0.3500 | 0.8800 | Orthogonal projection captures XTTS training vocoder signatures, but exhibits domain shift on unseen commercial neural TTS engines. |
-| **VaaniShield Hierarchical Late Fusion** | **0.3600** | **0.3400** | Anchoring the global SSL stream on the unit sphere while fusing boundary transition dynamics as an auxiliary cue recovers held-out EER from 0.7400 down to 0.3400 without severe generalization collapse. |
-
-> **Scientific Finding**: When acoustic bandwidth shortcuts are eliminated (all audio normalized to 8000 Hz telephony standard):
-> 1. VaaniShield demonstrates competitive in-domain performance (**36.0% EER** vs. 39.0% Baseline A and 48.0% Baseline B).
-> 2. Generalization on unseen commercial neural synthesizers (Edge Neural TTS) is stabilized by hierarchical late fusion and unit-norm cosine geometry, reducing Held-Out EER from 0.7400 down to **0.3400**.
-
----
-
-## 4. Repository Structure
-
-```
-vaanishield/
-├── configs/                   # YAML configs: feature params, model hyperparams, paths
-├── data/
-│   ├── raw/                   # Source recordings (bona-fide OpenSLR + neural clones)
-│   ├── processed/             # Processed master_manifest.jsonl and augmented audio
-│   ├── consent_forms/         # Speaker registry and open corpus licensing records
-│   └── scripts/               # Manifest generation, noise augmentation, alignment
-├── vaanishield/                # Core Python package
-│   ├── boundary/               # Code-switch localization + boundary-local feature extraction
-│   ├── speaker_null/            # SNAP speaker-nulling orthogonal subspace projection
-│   ├── fusion/                  # Calibrated fusion classifier + acoustic explainability
-│   ├── baselines/               # Baseline A (generic acoustic) and Baseline B (Indian-accent LFCC)
-│   ├── evaluation/              # Metrics calculation, bootstrap CIs, ablation harness
-│   └── utils/                   # Audio I/O, logging, signal processing
-├── demo/                      # FastAPI research demo server and streaming WebSocket
-├── web/                       # React / Vite web dashboard (desktop-optimized)
-├── tests/                     # 27 pytest unit, integration, API, WebSocket, and zero-pickle tests
-└── scripts/                   # CLI tools: verify.py, train.py, evaluate.py, run_ablation.py, export_onnx.py, benchmark_latency.py, analyze_scale_power.py
-```
-
----
-
-## 5. Quickstart & Execution
-
-### 1. Setup Environment
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-### 2. Run Test Suite & Acceptance Gate
-```bash
-# Run unit and integration tests (27 passing)
-pytest tests/ -v
-
-# Run 9-point strict acceptance gate
-python scripts/verify.py
-
-# Benchmark end-to-end pipeline latency
-python scripts/benchmark_latency.py
-
-# Run statistical power and dataset scaling analysis
-python scripts/analyze_scale_power.py
-```
-
-### 3. Launch Research Demo Server & Web Dashboard
-```bash
-# Start backend API (FastAPI) on port 8000
-python -m uvicorn demo.api.server:app --port 8000
-
-# In a separate terminal, launch the web interface
+pip install -r requirements-ci.txt
+python -m pytest tests/ -v
+PYTHONPATH=. python scripts/verify.py --metadata-only
+PYTHONPATH=. python scripts/validate_dataset.py --metadata-only
 cd web
-npm install
-npm run dev
+npm ci
+npm run build
 ```
-Open `http://localhost:5173` in your browser to inspect test audio samples, record audio via microphone, and view acoustic seam explanations.
 
----
+API and streaming tests use a deterministic, tiny **test-only** fitted classifier and
+synthetic waveform fixtures. NPZ serialization is compared to that fitted classifier;
+a small ONNX graph tests runtime execution. None of these fixtures validate detection
+accuracy, replace the trained model, or modify the deployed application.
 
-## 6. Privacy & Ethics (DPDPA 2023 Compliance)
+The trained-model ONNX parity test is explicitly skipped by default. To run it, provision
+these trusted, matching artifacts and their SHA-256 sidecars:
 
-1. **Lawful Basis & Corpus Provenance**: The speech dataset is constructed from open public academic corpora: OpenSLR 103 (Hindi, public research license), OpenSLR 65 (Tamil, CC BY-SA 4.0), and OpenSLR 79 (Kannada, CC BY-SA 4.0). Clones were generated using Coqui XTTS v2 for scientific benchmarking.
-2. **Zero Transcript Storage**: In compliance with India's Digital Personal Data Protection Act (DPDPA 2023), VaaniShield performs strictly non-semantic acoustic analysis. Conversational speech content is never transcribed, stored, or leaked by the explainability layer.
-3. **Research Prototype**: This repository is an academic research prototype designed to study cross-lingual synthetic speech boundaries. It does not contain live carrier wiretapping capabilities.
+- `checkpoints/fusion_checkpoint.pkl`
+- `checkpoints/onnx/vaanishield_end_to_end.onnx`
+- `checkpoints/onnx/model_parameters.npz`
 
----
+```bash
+python -m pytest tests/test_zero_pickle_onnx.py --run-artifact-tests -v
+```
 
-## 7. Technical Debt, Latency Profile & Production Scaling Roadmap
+Opting in fails if required artifacts are missing. There is no verified model-release
+URL in this repository. Do not download arbitrary pickle files or treat a generated test
+model as the research checkpoint.
 
-### A. End-to-End Latency Profile (< 200 ms Telephony Budget)
-While standalone ONNX classification executes in **0.019 ms**, full end-to-end inference previously required ~250–400 ms due to redundant disk I/O, Praat pitch tracking, and multiple STFT re-computations.
-- **In-Memory Audio Optimization**: Redundant file decodes eliminated; audio buffer passed directly across changepoint, boundary feature, and SNAP embedding extractors.
-- **Measured Latency Profile (Empirical Benchmark, N=75 runs)**:
-  - Audio I/O: 1.25 ms
-  - Acoustic Flux Changepoints: 5.63 ms
-  - Boundary Feature Extraction: 46.99 ms
-  - SNAP Embedding & Projection: 18.22 ms
-  - Pure ONNX Inference (E2E): 0.14 ms
-  - **Full End-to-End Pipeline**: **73.21 ms (median) | 110.40 ms (P95) | 141.87 ms (P99)**
-  - Successfully satisfies the 200 ms inter-turn real-time telecom latency budget.
+### Audit scope
 
-### B. Model Deserialization & Zero-Pickle Security Architecture
-Enterprise banking deployments (RBI, SOC2, ISO 27001) prohibit Python `pickle` deserialization due to arbitrary code execution risks.
-- **Pure ONNX Execution**: `checkpoints/onnx/vaanishield_end_to_end.onnx` integrates SNAP orthogonal subspace projection and hierarchical multi-stream fusion directly into an ONNX graph.
-- **Zero-Pickle Weights (`.npz`)**: All model parameters and scalers are serialized into `model_parameters.npz` using `np.savez_compressed(..., allow_pickle=False)` with a SHA-256 sidecar digest (`model_parameters.npz.sha256`).
-- **Cryptographic Parity**: Verified bit-level numerical parity between zero-pickle ONNX Runtime and Scikit-Learn to $< 10^{-7}$ tolerance.
+CI runs **metadata checks**, not a complete corpus or scientific acceptance audit.
+`--metadata-only` explicitly reports that missing audio was not verified and skips the
+bandwidth test. Without that option, both scripts fail when referenced audio is absent:
 
-### C. Production Scale Indic Corpus (16 Speakers, 800 Utterances)
-- **Scaled Multi-Lingual Corpus Engine**: Automated streaming expansion pipeline in `scripts/build_scaled_corpus.py` scaled the dataset from the 8-speaker pilot to **16 distinct speakers across 4 Indian linguistic families** via HTTP Range requests without downloading multi-gigabyte ZIP archives:
-  - **Hindi (North India)**: OpenSLR 103 (`spk_1119`, `spk_2131`, `spk_3701`, `spk_5945`)
-  - **Tamil (South India)**: OpenSLR 65 (`spk_ta_01`, `spk_ta_02`, `spk_ta_03`, `spk_ta_04`)
-  - **Kannada (South India)**: OpenSLR 79 (`spk_kn_01`, `spk_kn_02`, `spk_kn_03`, `spk_kn_04`)
-  - **Telugu (South India)**: OpenSLR 66 (`spk_te_01`, `spk_te_02`, `spk_te_03`, `spk_te_04`)
-- **Corpus Verification**: Generated `data/processed/scaled_master_manifest.jsonl` (800 audio files, strictly dual-class, zero speaker/source overlap, overlapping loudness distributions) which passes all 9 strict acceptance gate checks via `python scripts/verify.py`.
-- **Confidence Interval Compression**:
-  - Pilot (N=50 held-out clips, 1 speaker): 95% Wilson CI margin of error = **±13.20%**
-  - Scaled Corpus (N=150 held-out clips, 3 speakers): 95% Wilson CI margin of error = **±7.89%** (**40.2% reduction in statistical uncertainty**)
-  - Enterprise Target (N=10,000 held-out clips, 400 speakers): 95% Wilson CI margin of error = **±0.98%** (audit-grade bank certification standard)
+```bash
+PYTHONPATH=. python scripts/verify.py
+PYTHONPATH=. python scripts/validate_dataset.py
+```
 
-### D. Adaptive Regularized Subspace Projection (ARS-SNAP) for Cross-Synthesizer Generalization
-In the pilot, rigid hard orthogonal projection ($U U^T$) with small speaker pools ($k \le 4$) risks capturing training vocoder signatures (Coqui XTTS v2) rather than purely invariant speaker identity.
-- **Mathematical Formulation**: Implemented Tikhonov regularized soft-shrinkage projection in `vaanishield/speaker_null/snap_projection.py`:
-  $$w_i = \frac{\sigma_i^2}{\sigma_i^2 + \lambda \cdot \sigma_0^2}, \quad U_{\text{eff}} = U \cdot \text{diag}(\sqrt{w_i}), \quad e_{\text{null}} = (I - U_{\text{eff}} U_{\text{eff}}^T) e$$
-- **Generalization Across 4 Operational Regimes** (`results/generalization_report.md`):
-  1. *In-Domain Test* (N=200): Seen languages & synthesizers
-  2. *Cross-Dialect / Cross-Language* (N=200): Unseen Telugu callers
-  3. *Cross-Channel Telephony* (N=320): G.711 $\mu$-law & AMR-WB codecs (**35.9% EER**)
-  4. *Out-of-Domain Commercial Synthesizers* (N=150): Microsoft Edge Neural Multilingual TTS
-- **Zero-Pickle & ONNX Parity**: ARS-SNAP shrinkage weights are embedded into `checkpoints/onnx/model_parameters.npz` and `checkpoints/onnx/vaanishield_end_to_end.onnx`, maintaining complete bit-level zero-pickle security.
+Run these against a complete, licensed local corpus. Narrative verdict review remains
+manual; the scripts do not certify consent, licensing, privacy compliance or model efficacy.
+
+## Running the research demo
+
+The full optional development environment is listed in `requirements.txt`. Model export
+also requires PyTorch. Corpus construction may require additional tools documented in the
+relevant scripts. Provision a trusted trained checkpoint before analyzing audio:
+
+```bash
+pip install -r requirements.txt
+python -m uvicorn demo.api.server:app --host 127.0.0.1 --port 8000
+# In another terminal:
+cd web && npm ci && npm run dev
+```
+
+Open `http://localhost:5173`. Some catalog entries reference audio not included in Git.
+Use licensed local recordings; do not expose this research API directly to the public.
+
+Checksum verification now requires a matching sidecar. Both `model.npz.sha256` and legacy
+`model.sha256` naming are accepted. A checksum detects corruption relative to a trusted
+reference, not publisher identity, and does not make pickle safe. Prefer NPZ/ONNX for
+inference. Never load untrusted pickle checkpoints.
+
+## Repository map
+
+- `vaanishield/boundary/`: localization and acoustic features
+- `vaanishield/speaker_null/`: statistical embedding and subspace projection
+- `vaanishield/fusion/`: classifier, NPZ/ONNX loading and explanations
+- `vaanishield/evaluation/`: metrics and ablations
+- `demo/api/`, `web/`: research API and dashboard
+- `data/`, `configs/`: manifests, provenance records and configuration
+- `scripts/`: training, evaluation, export, audit and profiling tools
+- `tests/`: software regression tests and opt-in trained-artifact parity
+- `results/`, `docs/`: historical reports and research writeups
+
+## Privacy and intended use
+
+Explanation output is designed to describe acoustic features without returning transcript
+text. That is one engineering control, not proof of DPDPA compliance or anonymization.
+Audio, supplied transcripts, metadata, generated reports and outgoing webhook payloads
+still require an appropriate lawful basis, access controls and retention policy.
+Use only recordings you are permitted to process. Human review and independent real-world
+validation are required before any consequential use.

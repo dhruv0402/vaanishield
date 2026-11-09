@@ -6,7 +6,7 @@ from starlette.testclient import TestClient
 from demo.api.server import app
 
 
-def test_websocket_streaming_pipeline():
+def test_websocket_streaming_pipeline(api_pipeline):
     """Verify continuous audio streaming, telemetry generation, and reset on WebSocket."""
     client = TestClient(app)
     with client.websocket_connect("/ws/stream_analyze") as websocket:
@@ -35,7 +35,7 @@ def test_websocket_streaming_pipeline():
         assert ack["type"] == "reset_ack"
 
 
-def test_websocket_twilio_sip_streaming():
+def test_websocket_twilio_sip_streaming(api_pipeline):
     """Verify live Twilio Media Stream / SIP trunk JSON protocol with base64 encoded G.711 mu-law."""
     import base64
     import audioop

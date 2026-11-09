@@ -13,10 +13,13 @@ from vaanishield.speaker_null.snap_projection import SpeakerNullingProjector
 from vaanishield.utils.audio_io import load_audio
 
 
+@pytest.mark.artifact
 def test_onnx_engine_initialization_and_parity():
     """Verify that pure ONNX engine initializes with SHA-256 verification and matches PKL model."""
     onnx_path = "checkpoints/onnx/vaanishield_end_to_end.onnx"
     assert os.path.exists(onnx_path), f"ONNX model missing at {onnx_path}"
+    npz_path = "checkpoints/onnx/model_parameters.npz"
+    assert os.path.exists(npz_path), f"Deployed NPZ model missing at {npz_path}"
 
     engine = VaaniShieldONNXEngine(onnx_path, verify_checksum=True)
 
@@ -35,6 +38,9 @@ def test_onnx_engine_initialization_and_parity():
     # 2. Prediction via PyTorch / scikit-learn pipeline
     snap_emb = pkl_projector.project(test_raw)
     pkl_probs = pkl_model.predict_proba(test_b, snap_emb)
+    npz_data = FusionClassifier.load_checkpoint(npz_path, verify_checksum=True)
+    npz_probs = npz_data["model"].predict_proba(test_b, npz_data["projector"].project(test_raw))
+    assert np.allclose(npz_probs, pkl_probs, atol=1e-4), "Deployed NPZ/PKL parity mismatch"
 
     max_diff = np.max(np.abs(onnx_probs - pkl_probs))
     assert max_diff < 1e-4, f"Parity mismatch between ONNX and PKL model: {max_diff}"
@@ -45,9 +51,11 @@ def test_onnx_engine_initialization_and_parity():
         assert decision in ["ALLOW_VERIFIED", "STEP_UP_AUTH", "BLOCK_AND_ALERT"]
 
 
-def test_zero_pickle_npz_loading():
+def test_zero_pickle_npz_loading(tmp_path, fitted_pipeline):
     """Verify loading from .npz parameter container without Python pickle."""
-    npz_path = "checkpoints/onnx/model_parameters.npz"
+    fitted_model, fitted_projector = fitted_pipeline
+    npz_path = str(tmp_path / "model_parameters.npz")
+    FusionClassifier.save_parameters_npz(fitted_model, fitted_projector, npz_path)
     assert os.path.exists(npz_path), f"NPZ model missing at {npz_path}"
 
     data = FusionClassifier.load_checkpoint(npz_path, verify_checksum=True)
@@ -63,6 +71,8 @@ def test_zero_pickle_npz_loading():
 
     snap_emb = projector.project(test_raw)
     probs = model.predict_proba(test_b, snap_emb)
+    expected = fitted_model.predict_proba(test_b, fitted_projector.project(test_raw))
+    assert np.allclose(probs, expected, atol=1e-6)
     assert probs.shape == (5, 2)
     assert np.all(probs >= 0.0) and np.all(probs <= 1.0)
     assert np.allclose(np.sum(probs, axis=1), 1.0)
@@ -72,6 +82,77 @@ def test_zero_pickle_npz_loading():
     assert len(ci_low) == 5
     assert len(ci_high) == 5
     assert np.all(ci_low <= point_est) and np.all(point_est <= ci_high)
+
+
+@pytest.mark.parametrize("loader", [verify_sha256_sidecar, FusionClassifier.load_zero_pickle,
+                                    FusionClassifier.load_checkpoint])
+def test_verified_loading_requires_checksum(tmp_path, loader):
+    model_path = tmp_path / "unverified.npz"
+    model_path.write_bytes(b"not a valid model")
+    with pytest.raises(FileNotFoundError, match="SHA-256 sidecar"):
+        loader(str(model_path))
+
+
+@pytest.mark.parametrize("contents", ["", "not-a-sha256 model.npz\n"])
+def test_rejects_malformed_checksum(tmp_path, contents):
+    model_path = tmp_path / "model.npz"
+    model_path.write_bytes(b"payload")
+    model_path.with_suffix(".sha256").write_text(contents)
+    with pytest.raises(ValueError, match="Invalid SHA-256"):
+        verify_sha256_sidecar(str(model_path))
+
+
+def test_onnx_runtime_executes_known_test_graph(tmp_path):
+    """Runtime contract test, not a trained detector or accuracy benchmark."""
+    import hashlib
+    import onnx
+    from onnx import TensorProto, helper
+
+    inputs = [helper.make_tensor_value_info("boundary_features", TensorProto.FLOAT, [None, 10]),
+              helper.make_tensor_value_info("raw_embeddings", TensorProto.FLOAT, [None, 768])]
+    output = helper.make_tensor_value_info("spoof_probability", TensorProto.FLOAT, [None, 1])
+    nodes = [helper.make_node("ReduceMean", ["boundary_features"], ["b"], axes=[1]),
+             helper.make_node("ReduceMean", ["raw_embeddings"], ["e"], axes=[1]),
+             helper.make_node("Add", ["b", "e"], ["sum"]),
+             helper.make_node("Sigmoid", ["sum"], ["spoof_probability"])]
+    graph = helper.make_graph(nodes, "synthetic-runtime-test", inputs, [output])
+    model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 13)])
+    model.ir_version = 8
+    path = tmp_path / "fixture.onnx"
+    onnx.save(model, path)
+    path.with_suffix(".sha256").write_text(hashlib.sha256(path.read_bytes()).hexdigest())
+    engine = VaaniShieldONNXEngine(str(path))
+    boundary = np.vstack([np.zeros(10), np.ones(10)]).astype(np.float32)
+    embeddings = np.vstack([np.zeros(768), np.ones(768)]).astype(np.float32)
+    probabilities = engine.predict_proba(boundary, embeddings)
+    assert np.allclose(probabilities, [[0.5, 0.5], [0.11920292, 0.88079708]], atol=1e-6)
+
+
+def test_pickle_verification_precedes_deserialization(tmp_path):
+    path = tmp_path / "model.pkl"
+    path.write_bytes(b"not a pickle")
+    with pytest.raises(FileNotFoundError, match="SHA-256 sidecar"):
+        FusionClassifier.load_checkpoint(str(path))
+
+
+def test_pickle_checksum_covers_deserialized_bytes(tmp_path, monkeypatch):
+    import hashlib
+    import pickle
+    from vaanishield.utils import integrity
+
+    path = tmp_path / "model.pkl"
+    path.write_bytes(pickle.dumps({"source": "unverified"}))
+    trusted_bytes = pickle.dumps({"source": "verified"})
+    path.with_suffix(".sha256").write_text(hashlib.sha256(trusted_bytes).hexdigest())
+    verifier = integrity.verify_sha256_sidecar
+
+    def replace_during_verification(filepath, *args, **kwargs):
+        path.write_bytes(trusted_bytes)
+        return verifier(filepath, *args, **kwargs)
+
+    monkeypatch.setattr(integrity, "verify_sha256_sidecar", replace_during_verification)
+    with pytest.raises(ValueError, match="Cryptographic integrity mismatch"):
+        FusionClassifier.load_checkpoint(str(path))
 
 
 def test_zero_pickle_checksum_tamper_detection(tmp_path):

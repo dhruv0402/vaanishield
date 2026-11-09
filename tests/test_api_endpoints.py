@@ -6,7 +6,7 @@ from demo.api.server import app, SAMPLE_CATALOG
 
 
 @pytest.fixture
-def client():
+def client(api_pipeline):
     return TestClient(app)
 
 
@@ -90,3 +90,8 @@ def test_api_webhook_dispatch_simulation(client):
     assert res["mode"] == "simulation"
     assert res["dispatched_payload"]["action"] == "TERMINATE_CALL"
     assert res["dispatched_payload"]["delivery_status"] == "SIMULATED_LOCAL_DISPATCH"
+
+
+@pytest.mark.parametrize("data,status", [({}, 400), ({"sample_id": "missing"}, 404)])
+def test_analyze_preserves_client_errors(client, data, status):
+    assert client.post("/api/analyze", data=data).status_code == status

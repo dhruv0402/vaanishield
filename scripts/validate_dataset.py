@@ -27,6 +27,7 @@ def validate_manifest_integrity(
     consent_csv: str = "data/consent_forms/consented_speakers.csv",
     min_duration_sec: float = 0.5,
     min_rms_threshold: float = 0.01,
+    metadata_only: bool = False,
 ) -> Dict[str, Any]:
     """Validates physical integrity of dataset manifest according to C2."""
     if not os.path.exists(manifest_path):
@@ -59,6 +60,7 @@ def validate_manifest_integrity(
     speakers_seen = set()
     durations = []
     rms_values = []
+    audio_files_verified = 0
 
     for idx, r in enumerate(records):
         utt_id = r.get("utterance_id", f"row_{idx}")
@@ -69,6 +71,7 @@ def validate_manifest_integrity(
 
         audio_path = r.get("audio_path")
         if audio_path and os.path.exists(audio_path):
+            audio_files_verified += 1
             info = sf.info(audio_path)
             dur = float(info.duration)
             if dur < min_duration_sec:
@@ -81,6 +84,8 @@ def validate_manifest_integrity(
                 raise ValueError(f"Utterance {utt_id} is near-silent: RMS = {rms:.5f}")
             rms_values.append(rms)
         else:
+            if not metadata_only:
+                raise FileNotFoundError(f"Audio file missing for {utt_id}: {audio_path}")
             dur = float(r.get("duration_sec", 0.0))
             if dur < min_duration_sec:
                 raise ValueError(f"Utterance {utt_id} duration {dur:.2f}s is less than {min_duration_sec}s")
@@ -116,6 +121,9 @@ def validate_manifest_integrity(
             split_stats[sp]["spoof"] += 1
 
     summary = {
+        "validation_scope": "metadata_only" if metadata_only else "physical_audio",
+        "audio_files_verified": audio_files_verified,
+        "audio_files_unverified": len(records) - audio_files_verified,
         "n_speakers": len(speakers_seen),
         "n_unique_sentences": len(unique_sentences),
         "total_utterances": len(records),
@@ -136,6 +144,10 @@ def validate_manifest_integrity(
     # Print summary per C2 requirement
     print("\n" + "=" * 60)
     print("VAANISHIELD DATASET INTEGRITY VALIDATION SUMMARY")
+    print(f"Validation scope: {summary['validation_scope']}")
+    print(f"Physical audio verified: {audio_files_verified}/{len(records)}")
+    if metadata_only:
+        print("Metadata-only audit: missing audio is NOT physically validated.")
     print("=" * 60)
     print(f"Total Speakers Verified: {summary['n_speakers']}")
     print(f"Unique Sentences: {summary['n_unique_sentences']}")
@@ -153,4 +165,9 @@ def validate_manifest_integrity(
 
 
 if __name__ == "__main__":
-    validate_manifest_integrity()
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--metadata-only", action="store_true",
+                        help="Check manifest metadata without certifying absent audio.")
+    args = parser.parse_args()
+    validate_manifest_integrity(metadata_only=args.metadata_only)

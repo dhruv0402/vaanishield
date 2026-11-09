@@ -35,7 +35,7 @@ def run_ablation_suite(
     """Train and evaluate 3 model variants:
     1. Boundary-local stream only
     2. Speaker-nulled global stream only
-    3. Full fused model
+    3. Early feature fusion (concatenated boundary and speaker-null features)
 
     Also evaluates on validation (`val`), in-domain test (`test`), and held-out synthesizer (`heldout`).
     """
@@ -99,6 +99,11 @@ def run_ablation_suite(
     y_test = np.array([1 if r.get("label") == "spoof" else 0 for r in test_records], dtype=np.int32)
     y_heldout = np.array([1 if r.get("label") == "spoof" else 0 for r in heldout_records], dtype=np.int32)
 
+    # Noise variants from the same source are not independent observations.
+    val_clusters = [r.get("source_utterance_id", r.get("speaker_id", "unknown")) for r in val_recs]
+    test_clusters = [r.get("source_utterance_id", r.get("speaker_id", "unknown")) for r in test_records]
+    heldout_clusters = [r.get("source_utterance_id", r.get("speaker_id", "unknown")) for r in heldout_records]
+
     # Metadata breakdowns
     val_breakdowns = {
         "noise_condition": [r.get("noise_condition", "clean") for r in val_recs],
@@ -149,7 +154,7 @@ def run_ablation_suite(
     preds_test_sn = clf_sn.predict_proba(X_te_sn)[:, 1]
     preds_heldout_sn = clf_sn.predict_proba(X_ho_sn)[:, 1]
 
-    # Variant 3: Fused (StandardScaled + L2 regularized)
+    # Variant 3: Early feature fusion (not FusionClassifier's weighted late fusion).
     train_fused_raw = np.concatenate([train_boundary_mat, train_nulled_embs], axis=1)
     scaler_f = StandardScaler().fit(train_fused_raw)
     X_tr_f = scaler_f.transform(train_fused_raw)
@@ -169,19 +174,20 @@ def run_ablation_suite(
 
     results: Dict[str, Any] = {
         "boundary_only": {
-            "val_eval": evaluate_by_breakdown(preds_val_boundary, y_val, val_breakdowns) if val_recs else {},
-            "test_eval": evaluate_by_breakdown(preds_test_boundary, y_test, test_breakdowns),
-            "heldout_generalization": evaluate_by_breakdown(preds_heldout_boundary, y_heldout, heldout_breakdowns),
+            "val_eval": evaluate_by_breakdown(preds_val_boundary, y_val, val_breakdowns, clusters=val_clusters) if val_recs else {},
+            "test_eval": evaluate_by_breakdown(preds_test_boundary, y_test, test_breakdowns, clusters=test_clusters),
+            "heldout_generalization": evaluate_by_breakdown(preds_heldout_boundary, y_heldout, heldout_breakdowns, clusters=heldout_clusters),
         },
         "speaker_null_only": {
-            "val_eval": evaluate_by_breakdown(preds_val_sn, y_val, val_breakdowns) if val_recs else {},
-            "test_eval": evaluate_by_breakdown(preds_test_sn, y_test, test_breakdowns),
-            "heldout_generalization": evaluate_by_breakdown(preds_heldout_sn, y_heldout, heldout_breakdowns),
+            "val_eval": evaluate_by_breakdown(preds_val_sn, y_val, val_breakdowns, clusters=val_clusters) if val_recs else {},
+            "test_eval": evaluate_by_breakdown(preds_test_sn, y_test, test_breakdowns, clusters=test_clusters),
+            "heldout_generalization": evaluate_by_breakdown(preds_heldout_sn, y_heldout, heldout_breakdowns, clusters=heldout_clusters),
         },
         "fused": {
-            "val_eval": evaluate_by_breakdown(preds_val_fused, y_val, val_breakdowns) if val_recs else {},
-            "test_eval": evaluate_by_breakdown(preds_test_fused, y_test, test_breakdowns),
-            "heldout_generalization": evaluate_by_breakdown(preds_heldout_fused, y_heldout, heldout_breakdowns),
+            "architecture": "early_feature_fusion",
+            "val_eval": evaluate_by_breakdown(preds_val_fused, y_val, val_breakdowns, clusters=val_clusters) if val_recs else {},
+            "test_eval": evaluate_by_breakdown(preds_test_fused, y_test, test_breakdowns, clusters=test_clusters),
+            "heldout_generalization": evaluate_by_breakdown(preds_heldout_fused, y_heldout, heldout_breakdowns, clusters=heldout_clusters),
         },
     }
 

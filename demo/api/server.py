@@ -317,6 +317,8 @@ async def analyze_audio(
             "explanations": explanations,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Inference error: {str(e)}")
     finally:

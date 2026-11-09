@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
 """
-VaaniShield Final Acceptance Gate Verification Script (Section 4)
+VaaniShield automated corpus and report checks.
 
-Fails loudly if ANY of the following 8 acceptance conditions fail:
-1. any manifest file missing, silent (RMS < 0.01), or shorter than 0.5 s
-2. fewer than 4 consented speakers, or any speaker without a signed-form file
+The default requires physical audio. --metadata-only is a partial CI audit and
+does not verify missing recordings or execute the bandwidth heuristic.
+Automated checks cover:
+1. any manifest audio missing, silent (RMS < 0.01), or shorter than 0.5 s
+2. fewer than 4 registered speakers, or missing recorded corpus provenance
 3. any speaker or source_utterance_id shared across splits
 4. any evaluation set (including held-out) with a single class
 5. bona-fide vs. spoof loudness distributions that do not overlap
 6. any CI with zero width where n > 1 and scores are not perfectly separable
 7. the same model/condition showing different EER in two reports
-8. a report verdict that is not derived from the numbers
+8. narrative verdict review is manual, NOT an automated pass
+9. a limited high-frequency bandwidth shortcut heuristic (physical audio only)
 
 Then prints:
 n_speakers, n_unique_sentences, n_bona_fide, n_spoof (per cloning system),
-split sizes, and the versions of every cloning model used.
+split sizes, and the manifest's cloning-system labels. Provenance records do not
+establish that a license or consent is legally sufficient for a particular use.
 """
 
 import csv
@@ -49,6 +53,7 @@ def run_verification(
     scores_csv: str = "results/scores.csv",
     eval_json: str = "results/evaluation_report.json",
     ablation_json: str = "results/ablation_report.json",
+    metadata_only: bool = False,
 ):
     print("\n" + "=" * 70)
     print("VAANISHIELD STRICT ACCEPTANCE GATE AUDIT")
@@ -83,6 +88,8 @@ def run_verification(
             if rms < 0.01:
                 fail(1, f"Audio file {audio_path} is near-silent: RMS = {rms:.5f}")
         else:
+            if not metadata_only:
+                fail(1, f"Audio file missing for {utt_id}: {audio_path}")
             duration = float(r.get("duration_sec", 0.0))
             if duration < 0.5:
                 fail(1, f"Manifest record {utt_id} duration {duration}s is shorter than 0.5s")
@@ -95,7 +102,10 @@ def run_verification(
         else:
             spoof_rms.append(rms)
 
-    pass_check(1, f"All {len(records)} audio files/manifest records verified (>0.5s, non-silent, normalized).")
+    if metadata_only:
+        print("[CHECK 1 LIMITED] Manifest metadata checked; missing audio NOT physically verified.")
+    else:
+        pass_check(1, f"All {len(records)} audio files verified (>0.5s, non-silent).")
 
     # -------------------------------------------------------------
     # Check 2: >= 4 registered speakers with documented corpus research licenses
@@ -187,43 +197,65 @@ def run_verification(
     with open(eval_json, "r", encoding="utf-8") as f:
         eval_data = json.load(f)
 
+    unavailable = []
     for m_key, m_val in eval_data.get("models", {}).items():
         for split_key in ("test", "heldout_generalization"):
             st = m_val.get(split_key, {}).get("overall", {})
             cnt = st.get("count", 0)
-            eer = st.get("eer", 0.0)
-            ci = st.get("eer_ci", [0.0, 0.0])
-            width = ci[1] - ci[0]
-            if cnt > 1 and 0.0 < eer < 1.0 and width <= 0.0:
+            eer = st.get("eer")
+            ci = st.get("eer_ci")
+            values = [eer] + list(ci) if isinstance(ci, (list, tuple)) and len(ci) == 2 else []
+            if len(values) != 3 or any(v is None or not isinstance(v, (int, float))
+                                       or not np.isfinite(v) for v in values):
+                unavailable.append(f"{m_key}/{split_key}")
+                continue
+            if not all(0 <= v <= 1 for v in values) or ci[1] < ci[0]:
+                fail(6, f"Model '{m_key}' in '{split_key}' has invalid EER/CI: {values}")
+            if cnt > 1 and 0.0 < eer < 1.0 and ci[1] - ci[0] <= 0.0:
                 fail(6, f"Model '{m_key}' in '{split_key}' has zero-width CI {ci} for non-separable EER {eer}")
 
-    pass_check(6, "Confidence intervals have verified positive width on non-separable scores.")
+    if unavailable:
+        message = f"EER or interval evidence unavailable: {', '.join(unavailable)}"
+        if not metadata_only:
+            fail(6, message)
+        print(f"[CHECK 6 UNAVAILABLE] {message}")
+    else:
+        pass_check(6, "Stored EER intervals have valid ranges and nonzero width where required.")
 
-    # -------------------------------------------------------------
-    # Check 7: Same model/condition showing identical EER in reports
-    # -------------------------------------------------------------
+    # Check 7: only compare reports that identify the same model/config/dataset.
+    # The early-feature-fusion ablation is NOT the two-stream late-fusion model.
     if not os.path.exists(ablation_json):
         fail(7, f"Ablation report missing: {ablation_json}")
-
     with open(ablation_json, "r", encoding="utf-8") as f:
         ablation_data = json.load(f)
-
-    fused_eval_eer = eval_data["models"]["vaanishield_fusion"]["test"]["overall"]["eer"]
-    fused_ablation_eer = ablation_data["fused"]["test_eval"]["overall"]["eer"]
-    if abs(fused_eval_eer - fused_ablation_eer) > 1e-4:
-        fail(7, f"EER discrepancy: eval report {fused_eval_eer} vs ablation report {fused_ablation_eer}")
-
-    fused_held_eval = eval_data["models"]["vaanishield_fusion"]["heldout_generalization"]["overall"]["eer"]
-    fused_held_abl = ablation_data["fused"]["heldout_generalization"]["overall"]["eer"]
-    if abs(fused_held_eval - fused_held_abl) > 1e-4:
-        fail(7, f"Held-out EER discrepancy: eval report {fused_held_eval} vs ablation report {fused_held_abl}")
-
-    pass_check(7, "Single source of truth verified: Fused model EER is identical across evaluation and ablation reports.")
+    evaluated = eval_data["models"]["vaanishield_fusion"]
+    ablated = ablation_data["fused"]
+    comparisons = [
+        (evaluated["test"]["overall"].get("eer"), ablated["test_eval"]["overall"].get("eer")),
+        (evaluated["heldout_generalization"]["overall"].get("eer"),
+         ablated["heldout_generalization"]["overall"].get("eer")),
+    ]
+    identity = evaluated.get("evaluation_identity", {})
+    identity_fields = ("model_sha256", "config_sha256", "manifest_sha256")
+    has_identity = (isinstance(identity, dict) and all(
+        isinstance(identity.get(key), str) and len(identity[key]) == 64
+        for key in identity_fields
+    ))
+    if any(v is None or not isinstance(v, (int, float)) or not np.isfinite(v)
+           for pair in comparisons for v in pair):
+        print("[CHECK 7 UNAVAILABLE] Cannot compare undefined EER values.")
+    elif not has_identity or identity != ablated.get("evaluation_identity"):
+        print("[CHECK 7 NOT COMPARABLE] Reports lack matching model/config/manifest identities; "
+              "early- and late-fusion estimators must not be forced to match.")
+    else:
+        if any(abs(left - right) > 1e-4 for left, right in comparisons):
+            fail(7, "EER discrepancy between reports with the same declared evaluation identity.")
+        pass_check(7, "EER matches for the same declared model/config/manifest identity.")
 
     # -------------------------------------------------------------
     # Check 8: Report verdict is derived programmatically from numbers
     # -------------------------------------------------------------
-    pass_check(8, "Report verdicts are derived programmatically from empirical confidence intervals.")
+    print("[CHECK 8 NOT AUTOMATED] Narrative verdicts require review against the reported numbers.")
 
     # -------------------------------------------------------------
     # Check 9: Anti-Shortcut Adversarial Gate (Bandwidth / Heuristic Audit)
@@ -233,7 +265,7 @@ def run_verification(
     # If a simple 1-feature heuristic can separate bona-fide from spoof with EER < 0.35,
     # the dataset is compromised and the gate fails immediately.
     test_recs = [r for r in records if r.get("split") == "test"]
-    if test_recs:
+    if test_recs and not metadata_only:
         import librosa
         from sklearn.metrics import roc_curve
         test_y = np.array([1 if r.get("label") == "spoof" else 0 for r in test_recs], dtype=np.int32)
@@ -249,8 +281,8 @@ def run_verification(
                 freqs = librosa.fft_frequencies(sr=sr_sig, n_fft=256)
                 ratio = float(stft_mag[freqs > 3500].sum() / (stft_mag.sum() + 1e-12))
                 hf_scores.append(ratio)
-            except Exception:
-                hf_scores.append(0.0)
+            except Exception as exc:
+                fail(9, f"Cannot measure bandwidth for {r['audio_path']}: {exc}")
 
         hf_scores = np.array(hf_scores)
         if len(np.unique(test_y)) > 1:
@@ -259,7 +291,10 @@ def run_verification(
             if eer_hf < 0.35:
                 fail(9, f"Bandwidth/High-Frequency shortcut detected! 1-feature HF-energy EER is {eer_hf:.4f} (< 0.35 threshold).")
 
-    pass_check(9, "Anti-shortcut gate passed: No trivial bandwidth or high-frequency heuristic separates classes (EER >= 0.35).")
+    if metadata_only:
+        print("[CHECK 9 SKIPPED] Bandwidth shortcut audit requires the physical test corpus.")
+    else:
+        pass_check(9, "No high-frequency shortcut found by the implemented heuristic.")
 
     # -------------------------------------------------------------
     # Summary Output
@@ -274,7 +309,9 @@ def run_verification(
             spoof_by_sys[sys_name] = spoof_by_sys.get(sys_name, 0) + 1
 
     print("\n" + "=" * 70)
-    print("ALL 9 ACCEPTANCE GATE CHECKS PASSED SUCCESSFULLY!")
+    print("AUTOMATED CHECKS COMPLETED; narrative verdict review remains manual.")
+    if metadata_only:
+        print("METADATA-ONLY AUDIT: not a complete acceptance gate or model validation.")
     print("=" * 70)
     print(f"n_speakers: {n_speakers}")
     print(f"n_unique_sentences: {unique_sentences}")
@@ -286,5 +323,10 @@ def run_verification(
 
 
 if __name__ == "__main__":
-    manifest = sys.argv[1] if len(sys.argv) > 1 else "data/processed/master_manifest.jsonl"
-    run_verification(manifest_path=manifest)
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("manifest", nargs="?", default="data/processed/master_manifest.jsonl")
+    parser.add_argument("--metadata-only", action="store_true",
+                        help="Check metadata/reports; do not certify missing audio or bandwidth.")
+    args = parser.parse_args()
+    run_verification(manifest_path=args.manifest, metadata_only=args.metadata_only)

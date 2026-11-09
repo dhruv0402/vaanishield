@@ -15,6 +15,16 @@ from vaanishield.utils.logging_utils import get_logger
 logger = get_logger("run_ablation")
 
 
+def _metric_row(name: str, metrics: Dict[str, Any]) -> str:
+    """Render undefined metrics without implying zero error or zero uncertainty."""
+    def display(value):
+        return f"{value:.4f}" if value is not None and np.isfinite(value) else "N/A"
+
+    low, high = metrics["eer_ci"]
+    return (f"| {name} | {display(metrics['eer'])} | [{display(low)}, {display(high)}] | "
+            f"{display(metrics['precision'])} | {display(metrics['recall'])} |\n")
+
+
 def run_ablation(
     config_path: str = "configs/default.yaml",
     scores_csv: str = "results/scores.csv",
@@ -23,8 +33,9 @@ def run_ablation(
 ) -> Dict[str, Any]:
     """Run full three-way ablation suite.
     
-    Reads master_manifest.jsonl for splits and runs ablation streams.
-    Aligns metrics with results/scores.csv for consistency.
+    Reads master_manifest.jsonl for splits and reports the fitted ablation
+    models' own metrics. Existing evaluation reports are not interchangeable
+    with this run. ``scores_csv`` is retained only for CLI/API compatibility.
     """
     with open(config_path, "r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
@@ -48,17 +59,6 @@ def run_ablation(
         val_records=val_recs,
     )
 
-    # If scores.csv exists, synchronize the fused model metric directly from evaluation_report.json
-    eval_report_json = out_path / "evaluation_report.json"
-    if eval_report_json.exists():
-        with open(eval_report_json, "r", encoding="utf-8") as f:
-            eval_data = json.load(f)
-        if "models" in eval_data and "vaanishield_fusion" in eval_data["models"]:
-            if "val" in eval_data["models"]["vaanishield_fusion"]:
-                results["fused"]["val_eval"] = eval_data["models"]["vaanishield_fusion"]["val"]
-            results["fused"]["test_eval"] = eval_data["models"]["vaanishield_fusion"]["test"]
-            results["fused"]["heldout_generalization"] = eval_data["models"]["vaanishield_fusion"]["heldout_generalization"]
-
     # Save JSON report
     report_json = out_path / "ablation_report.json"
     with open(report_json, "w", encoding="utf-8") as f:
@@ -68,7 +68,9 @@ def run_ablation(
     report_md = out_path / "ablation_report.md"
     with open(report_md, "w", encoding="utf-8") as f:
         f.write("# VaaniShield Three-Way Ablation Study\n\n")
-        f.write("Ablation evaluating individual and combined stream contributions across validation, in-domain test, and held-out sets.\n\n")
+        f.write("N/A indicates an undefined metric or unavailable confidence interval.\n\n")
+        f.write("Ablation evaluating individual streams and early feature fusion across validation, in-domain test, and held-out sets. "
+                "The concatenated-feature ablation is distinct from the production weighted late-fusion classifier.\n\n")
         if val_recs and results["fused"].get("val_eval"):
             f.write("## 1. Ablation Variant Performance (Validation Split)\n\n")
             f.write("| Stream / Variant | Validation EER | 95% Confidence Interval | Precision | Recall |\n")
@@ -76,10 +78,10 @@ def run_ablation(
             for v_key, v_name in [
                 ("boundary_only", "Boundary-Local Stream Only"),
                 ("speaker_null_only", "Speaker-Nulled Global Stream Only"),
-                ("fused", "**Full VaaniShield Fused Model**"),
+                ("fused", "**Early Feature Fusion (Boundary + SNAP)**"),
             ]:
                 ov_v = results[v_key]["val_eval"]["overall"]
-                f.write(f"| {v_name} | {ov_v['eer']:.4f} | [{ov_v['eer_ci'][0]:.4f}, {ov_v['eer_ci'][1]:.4f}] | {ov_v['precision']:.4f} | {ov_v['recall']:.4f} |\n")
+                f.write(_metric_row(v_name, ov_v))
             f.write("\n")
 
         f.write("## 2. Ablation Variant Performance (In-Domain Test Set)\n\n")
@@ -88,10 +90,10 @@ def run_ablation(
         for v_key, v_name in [
             ("boundary_only", "Boundary-Local Stream Only"),
             ("speaker_null_only", "Speaker-Nulled Global Stream Only"),
-            ("fused", "**Full VaaniShield Fused Model**"),
+            ("fused", "**Early Feature Fusion (Boundary + SNAP)**"),
         ]:
             ov = results[v_key]["test_eval"]["overall"]
-            f.write(f"| {v_name} | {ov['eer']:.4f} | [{ov['eer_ci'][0]:.4f}, {ov['eer_ci'][1]:.4f}] | {ov['precision']:.4f} | {ov['recall']:.4f} |\n")
+            f.write(_metric_row(v_name, ov))
 
         f.write("\n## 3. Generalization to Held-Out Synthesizer\n\n")
         f.write("| Stream / Variant | Held-Out Generalization EER | 95% Confidence Interval | Precision | Recall |\n")
@@ -99,10 +101,10 @@ def run_ablation(
         for v_key, v_name in [
             ("boundary_only", "Boundary-Local Stream Only"),
             ("speaker_null_only", "Speaker-Nulled Global Stream Only"),
-            ("fused", "**Full VaaniShield Fused Model**"),
+            ("fused", "**Early Feature Fusion (Boundary + SNAP)**"),
         ]:
             ov_h = results[v_key]["heldout_generalization"]["overall"]
-            f.write(f"| {v_name} | {ov_h['eer']:.4f} | [{ov_h['eer_ci'][0]:.4f}, {ov_h['eer_ci'][1]:.4f}] | {ov_h['precision']:.4f} | {ov_h['recall']:.4f} |\n")
+            f.write(_metric_row(v_name, ov_h))
 
     logger.info(f"Ablation study completed. Saved reports to {report_json} and {report_md}")
     return results

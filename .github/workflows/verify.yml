@@ -1,4 +1,4 @@
-name: VaaniShield Strict CI & Audit Gate
+name: VaaniShield Tests & Metadata Audit
 
 on:
   push:
@@ -14,11 +14,12 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.10
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.12"
           cache: "pip"
+          cache-dependency-path: requirements-ci.txt
 
       - name: Install System Dependencies
         run: |
@@ -28,22 +29,31 @@ jobs:
       - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          pip install -r requirements.txt
+          pip install -r requirements-ci.txt
 
       - name: Run Unit & Integration Tests (pytest)
         run: |
-          PYTHONPATH=. pytest tests/ -v --tb=short
+          python -m pytest tests/ -v --tb=short
 
-      - name: Verify Strict 8-Point Acceptance Gate
+      - name: Audit Tracked Metadata and Report Consistency
         run: |
-          PYTHONPATH=. python scripts/verify.py
+          PYTHONPATH=. python scripts/verify.py --metadata-only
 
-      - name: Validate Dataset Governance & G-Eval Metrics
+      - name: Validate Dataset Metadata (Audio Not Distributed)
         run: |
-          PYTHONPATH=. python scripts/validate_dataset.py
+          PYTHONPATH=. python scripts/validate_dataset.py --metadata-only
 
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
       - name: Build Web Dashboard (Vite Frontend)
         run: |
           cd web
-          npm ci || npm install
+          npm ci
           npm run build

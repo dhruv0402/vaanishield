@@ -7,10 +7,9 @@ Combines:
   2. The Boundary-Local Feature Stream (vaanishield.boundary.features) as an auxiliary
      gating/refinement cue (10% weight) capturing prosodic/formant transitions.
 
-This hierarchical late-decision formulation prevents over-regularized or smoothed
-unseen synthesizers (e.g. Edge-TTS) from inverting the overall decision, delivering
-robust cross-architecture generalization on held-out synthesizers while preserving
-high sensitivity on code-switch boundary seams.
+This late-decision formulation combines two signals. Generalization to unseen
+callers and synthesizers must be measured on independent data; it is not
+guaranteed by the architecture or the choice of fusion weights.
 """
 
 from dataclasses import dataclass, field
@@ -465,15 +464,8 @@ class FusionClassifier:
             raise FileNotFoundError(f"Zero-pickle file not found: {path}")
 
         if verify_checksum:
-            sha_path = path.with_suffix(".sha256")
-            if sha_path.exists():
-                with open(path, "rb") as f:
-                    computed = hashlib.sha256(f.read()).hexdigest()
-                with open(sha_path, "r", encoding="utf-8") as f:
-                    expected = f.read().split()[0].strip()
-                if computed != expected:
-                    raise ValueError(f"Zero-pickle integrity check failed for {path}!")
-                logger.info(f"Zero-pickle integrity verified: {computed[:12]}...")
+            from vaanishield.utils.integrity import verify_sha256_sidecar
+            verify_sha256_sidecar(str(path))
 
         with np.load(path, allow_pickle=False) as data:
             b_mean = np.array(data["b_mean"], dtype=np.float32)
@@ -541,20 +533,10 @@ class FusionClassifier:
         with open(path, "rb") as f:
             raw_bytes = f.read()
             
-        computed_sha256 = hashlib.sha256(raw_bytes).hexdigest()
-        sha_path = path.with_suffix(".sha256")
-        
-        if verify_checksum and sha_path.exists():
-            with open(sha_path, "r", encoding="utf-8") as f:
-                expected_sha256 = f.read().split()[0].strip()
-            if computed_sha256 != expected_sha256:
-                raise ValueError(
-                    f"Checkpoint integrity verification failed for {path}!\n"
-                    f"Expected: {expected_sha256}\n"
-                    f"Computed: {computed_sha256}"
-                )
-            logger.info(f"Checkpoint integrity verified: {computed_sha256[:12]}...")
-            
+        if verify_checksum:
+            from vaanishield.utils.integrity import verify_sha256_sidecar
+            verify_sha256_sidecar(str(path), payload=raw_bytes)
+
         return pickle.loads(raw_bytes)
 
 

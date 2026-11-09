@@ -1,10 +1,9 @@
 """
 Pure ONNX Inference Engine for VaaniShield.
 
-Provides zero-pickle, secure model evaluation compliant with enterprise banking
-security standards (RBI, SOC2, ISO 27001). Completely eliminates Python pickle
-deserialization vulnerability by executing pure ONNX computational graphs and
-loading verified array buffers with SHA-256 integrity sidecars.
+Executes ONNX graphs without Python pickle deserialization and checks artifacts
+against required SHA-256 sidecars by default. This integrity mechanism is not
+publisher authentication, regulatory compliance or a security certification.
 """
 import hashlib
 import json
@@ -19,33 +18,7 @@ from vaanishield.utils.logging_utils import get_logger
 logger = get_logger("onnx_engine")
 
 
-def verify_sha256_sidecar(filepath: str) -> None:
-    """Validate that the file matches its corresponding .sha256 sidecar."""
-    path = Path(filepath)
-    if not path.exists():
-        raise FileNotFoundError(f"Target model file not found: {path}")
-
-    sha_path = path.with_suffix(path.suffix + ".sha256")
-    if not sha_path.exists():
-        sha_path = path.with_suffix(".sha256")
-
-    if not sha_path.exists():
-        logger.warning(f"No SHA-256 sidecar found for {path}, proceeding with raw checksum.")
-        return
-
-    with open(path, "rb") as f:
-        computed = hashlib.sha256(f.read()).hexdigest()
-
-    with open(sha_path, "r", encoding="utf-8") as f:
-        expected = f.read().split()[0].strip()
-
-    if computed != expected:
-        raise ValueError(
-            f"Cryptographic integrity mismatch for {path}!\n"
-            f"Expected SHA-256: {expected}\n"
-            f"Computed SHA-256: {computed}"
-        )
-    logger.info(f"Verified SHA-256 integrity for {path.name}: {computed[:12]}...")
+from vaanishield.utils.integrity import verify_sha256_sidecar
 
 
 class VaaniShieldONNXEngine:

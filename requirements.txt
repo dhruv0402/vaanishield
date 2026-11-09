@@ -34,6 +34,12 @@ streamlit>=1.35.0
 fastapi>=0.110.0
 uvicorn>=0.28.0
 python-multipart>=0.0.9
+reportlab>=4.2,<5           # PDF reports imported by the API
+httpx>=0.27,<1              # FastAPI/Starlette TestClient
+
+# --- Secure model runtime and export ---
+onnxruntime>=1.18,<2
+onnx>=1.16,<2
 
 # --- Config / tooling ---
 pyyaml>=6.0.1

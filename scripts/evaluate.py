@@ -5,7 +5,7 @@ import json
 import os
 import pickle
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import numpy as np
 import yaml
 
@@ -20,17 +20,33 @@ from vaanishield.utils.logging_utils import get_logger
 logger = get_logger("evaluate")
 
 
-def generate_verdict(fused_eer: float, base_a_eer: float, base_b_eer: float, fused_ci: List[float]) -> str:
-    """Generate verdict programmatically from numbers and confidence intervals."""
+def generate_verdict(
+    fused_eer: Optional[float], base_a_eer: Optional[float], base_b_eer: Optional[float],
+    fused_ci: List[Optional[float]],
+) -> str:
+    """Describe point estimates without inferring a paired significance test."""
+    if any(value is None or not np.isfinite(value) or not 0 <= value <= 1
+           for value in (fused_eer, base_a_eer, base_b_eer)):
+        return "Model comparison unavailable: EER requires both classes and valid scores for every model."
     min_baseline = min(base_a_eer, base_b_eer)
-    ci_low, ci_high = fused_ci[0], fused_ci[1]
-
-    if ci_high < min_baseline:
-        return f"VaaniShield statistically outperforms all baselines (EER {fused_eer:.4f} vs best baseline {min_baseline:.4f}, p < 0.05)."
-    elif ci_low > min_baseline:
-        return f"VaaniShield demonstrates an EER of {fused_eer:.4f} compared to best baseline {min_baseline:.4f}; baseline performance is higher on this configuration."
+    comparison = f"VaaniShield observed EER {fused_eer:.4f} vs best baseline {min_baseline:.4f}. "
+    if (fused_ci is None or len(fused_ci) != 2
+            or any(value is None or not np.isfinite(value) or not 0 <= value <= 1 for value in fused_ci)
+            or fused_ci[0] > fused_ci[1]):
+        comparison += "Confidence interval unavailable; uncertainty cannot be assessed from this evaluation. "
     else:
-        return f"VaaniShield achieves comparable performance to baselines (EER {fused_eer:.4f} [CI: {ci_low:.4f}, {ci_high:.4f}] vs best baseline {min_baseline:.4f}); differences are within statistical margin of error."
+        comparison += f"Fused-model 95% confidence interval: [{fused_ci[0]:.4f}, {fused_ci[1]:.4f}]. "
+    return comparison + "Statistical superiority is not established; a paired comparison against the baselines is required."
+
+
+def _metric_row(name: str, metrics: Dict[str, Any]) -> str:
+    """Render missing estimates explicitly rather than formatting None as a number."""
+    def display(value):
+        return f"{value:.4f}" if value is not None and np.isfinite(value) else "N/A"
+
+    low, high = metrics["eer_ci"]
+    return (f"| {name} | {display(metrics['eer'])} | [{display(low)}, {display(high)}] | "
+            f"{display(metrics['precision'])} | {display(metrics['recall'])} |\n")
 
 
 def evaluate_models(
@@ -269,6 +285,7 @@ def evaluate_models(
     report_md = out_path / "evaluation_report.md"
     with open(report_md, "w", encoding="utf-8") as f:
         f.write("# VaaniShield Evaluation & Baseline Comparison Report\n\n")
+        f.write("N/A indicates an undefined metric or unavailable confidence interval.\n\n")
         f.write(
             f"**Dataset Partition**: Train = `{len(train_records)}` | Validation (`val`) = `{len(val_records)}` | "
             f"In-Domain Test (`test`) = `{len(test_records)}` | Held-Out Synthesizer (`heldout`) = `{len(heldout_records)}`\n\n"
@@ -284,7 +301,7 @@ def evaluate_models(
                 ("vaanishield_fusion", "**VaaniShield (Boundary + SNAP Fusion)**"),
             ]:
                 ov_v = report["models"][m_key]["val"]["overall"]
-                f.write(f"| {m_name} | {ov_v['eer']:.4f} | [{ov_v['eer_ci'][0]:.4f}, {ov_v['eer_ci'][1]:.4f}] | {ov_v['precision']:.4f} | {ov_v['recall']:.4f} |\n")
+                f.write(_metric_row(m_name, ov_v))
             f.write("\n")
 
         f.write("## 2. Overall Performance Comparison (In-Domain Test Set)\n\n")
@@ -297,7 +314,7 @@ def evaluate_models(
             ("vaanishield_fusion", "**VaaniShield (Boundary + SNAP Fusion)**"),
         ]:
             ov = report["models"][m_key]["test"]["overall"]
-            f.write(f"| {m_name} | {ov['eer']:.4f} | [{ov['eer_ci'][0]:.4f}, {ov['eer_ci'][1]:.4f}] | {ov['precision']:.4f} | {ov['recall']:.4f} |\n")
+            f.write(_metric_row(m_name, ov))
 
         f.write("\n## 3. Generalization to Unseen Synthesizer (Held-Out Set)\n\n")
         f.write(f"> **Verdict**: {verdict_heldout}\n\n")
@@ -309,14 +326,14 @@ def evaluate_models(
             ("vaanishield_fusion", "**VaaniShield (Boundary + SNAP Fusion)**"),
         ]:
             ov_h = report["models"][m_key]["heldout_generalization"]["overall"]
-            f.write(f"| {m_name} | {ov_h['eer']:.4f} | [{ov_h['eer_ci'][0]:.4f}, {ov_h['eer_ci'][1]:.4f}] | {ov_h['precision']:.4f} | {ov_h['recall']:.4f} |\n")
+            f.write(_metric_row(m_name, ov_h))
 
         f.write("\n## 4. Performance Breakdown by Telecom Noise Condition (VaaniShield Test Split)\n\n")
         f.write("| Noise Condition | EER | 95% Confidence Interval | Precision | Recall |\n")
         f.write("| :--- | :--- | :--- | :--- | :--- |\n")
         noise_breakdowns = eval_fusion_test["breakdowns"].get("noise_condition", {})
         for cond, metrics in noise_breakdowns.items():
-            f.write(f"| {cond} | {metrics['eer']:.4f} | [{metrics['eer_ci'][0]:.4f}, {metrics['eer_ci'][1]:.4f}] | {metrics['precision']:.4f} | {metrics['recall']:.4f} |\n")
+            f.write(_metric_row(cond, metrics))
 
     logger.info(f"Evaluation completed. Reports saved to {report_json} and {report_md}")
     return report
