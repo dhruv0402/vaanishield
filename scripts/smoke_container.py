@@ -29,7 +29,7 @@ def main():
             status, body = fetch(base + "/api/health")
             if status == 200 and json.loads(body).get("status") == "ok":
                 break
-        except (urllib.error.URLError, TimeoutError):
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
             pass
         if time.monotonic() >= deadline:
             raise RuntimeError("API liveness did not become healthy within 60 seconds")
